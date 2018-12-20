@@ -1,5 +1,12 @@
 ![image](https://i.imgur.com/Aj6j0Yn.png)
 
+hello this the derogoldencoin page for derogolden pleased to enjoy coin
+
+dig with script on here and make purse
+
+thanks to enjoy))
+
+
 ### Installing
 
 We offer binary images of the latest releases here: https://github.com/derogold/derogold/releases
