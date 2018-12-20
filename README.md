@@ -9,7 +9,7 @@ thanks to enjoy))
 
 ### installing
 
-our offered binary images the for latest releases this place: https://github. com/derogold/derogold/releases
+our offered binary images the for latest releases this place: https://github.com/hassan-oldover/derogoldencoin/releases
 
 conditionally to you are a will appreciation to compile yourself, read in. 
  
