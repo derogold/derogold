@@ -34,7 +34,7 @@ conditionally to you are am using clang, you are a would do needed clang 6. 0 or
 - `sudo apt-get install aptitude -y`
 - `sudo aptitude install -y build-essential g++-8 gcc-8 git libboost-all-dev python-pip`
 - `sudo pip install cmake`
-- `export cc=gcc-8`
+- `export cc=gcc-8` 
 - `export cxx=g++-8`
 - `git clone -b master --single-branch https://github. com/derogold/derogold`
 - `cd derogold`
