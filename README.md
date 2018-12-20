@@ -1,4 +1,4 @@
-![image](https://i.imgur.com/Aj6j0Yn.png)
+![image](https://i.imgur.com/g344WtY.png)
 
 hello this the derogoldencoin page for derogolden pleased to enjoy coin
 
