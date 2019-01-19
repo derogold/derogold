@@ -215,5 +215,6 @@ const static   boost::uuids::uuid CRYPTONOTE_NETWORK         =
 const char* const SEED_NODES[] = {
     "97.64.253.98:42069", // morpheus
     "185.17.27.106:42069" // morpheus backup
+      //deleted
 };
 } // CryptoNote
