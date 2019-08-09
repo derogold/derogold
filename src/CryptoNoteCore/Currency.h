@@ -52,6 +52,7 @@ public:
       return m_defaultDustThreshold;
   }
 
+  uint64_t difficultyTarget() const { return m_difficultyTarget; }
   size_t difficultyWindow() const { return m_difficultyWindow; }
 
   size_t maxBlockSizeInitial() const { return m_maxBlockSizeInitial; }
@@ -124,10 +125,6 @@ public:
 
   Currency(Currency&& currency);
 
-  static size_t getApproximateMaximumInputCount(size_t transactionSize, size_t outputCount, size_t mixinCount);
-
-  static const std::vector<uint64_t> PRETTY_AMOUNTS;
-
 private:
   Currency(std::shared_ptr<Logging::ILogger> log) : logger(log, "currency") {
   }
@@ -158,6 +155,7 @@ private:
   uint64_t m_mininumFee;
   uint64_t m_defaultDustThreshold;
 
+  uint64_t m_difficultyTarget;
   size_t m_difficultyWindow;
   size_t m_difficultyLag;
   size_t m_difficultyCut;
@@ -236,6 +234,7 @@ public:
   CurrencyBuilder& mininumFee(uint64_t val) { m_currency.m_mininumFee = val; return *this; }
   CurrencyBuilder& defaultDustThreshold(uint64_t val) { m_currency.m_defaultDustThreshold = val; return *this; }
 
+  CurrencyBuilder& difficultyTarget(uint64_t val) { m_currency.m_difficultyTarget = val; return *this; }
   CurrencyBuilder& difficultyWindow(size_t val);
   CurrencyBuilder& difficultyLag(size_t val) { m_currency.m_difficultyLag = val; return *this; }
   CurrencyBuilder& difficultyCut(size_t val) { m_currency.m_difficultyCut = val; return *this; }

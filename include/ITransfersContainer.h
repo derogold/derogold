@@ -65,6 +65,8 @@ struct TransactionSpentOutputInformation: public TransactionOutputInformation {
   uint32_t inputInTransaction;
 };
 
+struct SpentTransactionOutput;
+
 class ITransfersContainer : public IStreamSerializable {
 public:
   enum Flags : uint32_t {
@@ -98,6 +100,8 @@ public:
   //only type flags are feasible for this function
   virtual std::vector<TransactionOutputInformation> getTransactionInputs(const Crypto::Hash& transactionHash, uint32_t flags) const = 0;
   virtual void getUnconfirmedTransactions(std::vector<Crypto::Hash>& transactions) const = 0;
+  virtual std::vector<SpentTransactionOutput> getUnspentInputs() const = 0;
+  virtual std::vector<SpentTransactionOutput> getSpentInputs() const = 0;
 };
 
 }

@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2018, The TurtleCoin Developers
+// Copyright (c) 2018-2019, The TurtleCoin Developers
 //
 // Please see the included LICENSE file for more information.
 
@@ -67,7 +67,9 @@ public:
     const uint64_t startHeight,
     const uint64_t startTimestamp,
     const uint64_t blockCount,
-    std::vector<WalletTypes::WalletBlockInfo> &walletBlocks) const override;
+    const bool skipCoinbaseTransactions,
+    std::vector<WalletTypes::WalletBlockInfo> &walletBlocks,
+    std::optional<WalletTypes::TopBlock> &topBlockInfo) const override;
 
   virtual bool getTransactionsStatus(
     std::unordered_set<Crypto::Hash> transactionHashes,
@@ -233,10 +235,6 @@ private:
 
   static WalletTypes::RawTransaction getRawTransaction(
     const std::vector<uint8_t> &rawTX);
-
-  static Crypto::PublicKey getPubKeyFromExtra(const std::vector<uint8_t> &extra);
-
-  static std::string getPaymentIDFromExtra(const std::vector<uint8_t> &extra);
 };
 
 }

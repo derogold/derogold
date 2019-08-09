@@ -1,4 +1,4 @@
-// Copyright (c) 2018, The TurtleCoin Developers
+// Copyright (c) 2018-2019, The TurtleCoin Developers
 //
 // Please see the included LICENSE file for more information.
 
@@ -6,7 +6,9 @@
 
 #include <config/CryptoNoteConfig.h>
 
-struct Config
+#include <Logger/Logger.h>
+
+struct ZedConfig
 {
     /* Was the wallet file specified on CLI */
     bool walletGiven = false;
@@ -25,6 +27,14 @@ struct Config
 
     /* The wallet password */
     std::string walletPass;
+
+    /* Controls what level of messages to log */
+    Logger::LogLevel logLevel = Logger::DISABLED;
+    
+    /* Use SSL with daemon */
+    bool ssl = false;
+
+    unsigned int threads;
 };
 
-Config parseArguments(int argc, char **argv);
+ZedConfig parseArguments(int argc, char **argv);

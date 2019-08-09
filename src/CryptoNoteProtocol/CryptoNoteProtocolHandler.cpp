@@ -13,9 +13,11 @@
 
 #include "CryptoNoteCore/CryptoNoteBasicImpl.h"
 #include "CryptoNoteCore/CryptoNoteFormatUtils.h"
-#include "CryptoNoteCore/CryptoNoteTools.h"
+#include "Common/CryptoNoteTools.h"
 #include "CryptoNoteCore/Currency.h"
 #include "P2p/LevinProtocol.h"
+
+#include <Serialization/SerializationTools.h>
 
 #include <Utilities/FormatTools.h>
 
@@ -145,6 +147,7 @@ static inline void serialize(NOTIFY_MISSING_TXS_request& request, ISerializer& s
 
 CryptoNoteProtocolHandler::CryptoNoteProtocolHandler(const Currency& currency, System::Dispatcher& dispatcher, ICore& rcore, IP2pEndpoint* p_net_layout, std::shared_ptr<Logging::ILogger> log) :
   m_dispatcher(dispatcher),
+  m_currency(currency),
   m_core(rcore),
   m_p2p(p_net_layout),
   m_synchronized(false),
@@ -263,20 +266,8 @@ bool CryptoNoteProtocolHandler::process_payload_sync_data(const CORE_SYNC_DATA& 
     /* Find the difference between the remote and the local height */
     int64_t diff = static_cast<int64_t>(remoteHeight) - static_cast<int64_t>(currentHeight);
 
-    uint64_t days;
-
-    if (currentHeight >= CryptoNote::parameters::DIFFICULTY_TARGET_V2_HEIGHT || remoteHeight < CryptoNote::parameters::DIFFICULTY_TARGET_V2_HEIGHT)
-    {
-        days = std::abs(diff) / (24 * 60 * 60 / CryptoNote::parameters::DIFFICULTY_TARGET_V2);
-    }
-    else
-    {
-        uint64_t blocksBefore = CryptoNote::parameters::DIFFICULTY_TARGET_V2_HEIGHT - currentHeight;
-        uint64_t blocksAfter = remoteHeight - CryptoNote::parameters::DIFFICULTY_TARGET_V2_HEIGHT;
-
-        days = blocksBefore / (24 * 60 * 60 / CryptoNote::parameters::DIFFICULTY_TARGET);
-        days += blocksAfter / (24 * 60 * 60 / CryptoNote::parameters::DIFFICULTY_TARGET_V2);
-    }
+    /* Find out how many days behind/ahead we are from the remote height */
+    uint64_t days = std::abs(diff) / (24 * 60 * 60 / m_currency.difficultyTarget());
 
     std::stringstream ss;
 

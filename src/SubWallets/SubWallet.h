@@ -68,13 +68,11 @@ class SubWallet
         std::tuple<uint64_t, uint64_t> getBalance(
             const uint64_t currentHeight) const;
 
-        void reset(const uint64_t startHeight, const uint64_t startTimestamp);
+        void reset(const uint64_t scanHeight);
 
         bool isPrimaryAddress() const;
 
         std::string address() const;
-
-        bool hasKeyImage(const Crypto::KeyImage keyImage) const;
 
         Crypto::PublicKey publicSpendKey() const;
         
@@ -86,7 +84,9 @@ class SubWallet
 
         void markInputAsLocked(const Crypto::KeyImage keyImage);
 
-        void removeForkedInputs(const uint64_t forkHeight);
+        std::vector<Crypto::KeyImage> removeForkedInputs(
+            const uint64_t forkHeight,
+            const bool isViewWallet);
 
         void removeCancelledTransactions(const std::unordered_set<Crypto::Hash> cancelledTransactions);
 
@@ -104,6 +104,10 @@ class SubWallet
         void convertSyncTimestampToHeight(
             const uint64_t timestamp,
             const uint64_t height);
+
+        void pruneSpentInputs(const uint64_t pruneHeight);
+
+        std::vector<Crypto::KeyImage> getKeyImages() const;
 
         /////////////////////////////
         /* Public member variables */

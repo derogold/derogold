@@ -14,12 +14,11 @@
 #include <ctime>
 
 #include <config/CryptoNoteConfig.h>
+#include <config/WalletConfig.h>
 
-#include <CryptoNoteCore/Core.h>
+#include <iomanip>
 
 #include <Rpc/CoreRpcServerCommandsDefinitions.h>
-
-#include <config/WalletConfig.h>
 
 namespace Utilities
 {
@@ -111,10 +110,7 @@ ForkStatus get_fork_status(
         }
     }
 
-    const float days = (next_fork - height) / 
-                      (height >= CryptoNote::parameters::DIFFICULTY_TARGET_V2_HEIGHT
-                     ? 24 * 60 * 60 / CryptoNote::parameters::DIFFICULTY_TARGET
-                     : 24 * 60 * 60 / CryptoNote::parameters::DIFFICULTY_TARGET_V2);
+    const float days = (next_fork - height) / CryptoNote::parameters::EXPECTED_NUMBER_OF_BLOCKS_PER_DAY;
 
     /* Next fork in < 30 days away */
     if (days < 30)
@@ -154,10 +150,7 @@ std::string get_fork_time(
         }
     }
 
-    const float days = static_cast<float>(next_fork - height) / 
-                      (height >= CryptoNote::parameters::DIFFICULTY_TARGET_V2_HEIGHT
-                     ? 24 * 60 * 60 / CryptoNote::parameters::DIFFICULTY_TARGET
-                     : 24 * 60 * 60 / CryptoNote::parameters::DIFFICULTY_TARGET_V2);
+    const float days = (static_cast<float>(next_fork - height) / CryptoNote::parameters::EXPECTED_NUMBER_OF_BLOCKS_PER_DAY);
 
     std::stringstream stream;
 
@@ -358,6 +351,14 @@ std::string prettyPrintBytes(uint64_t input)
         << suffixes[selectedSuffix];
 
     return msg.str();
+}
+
+std::string unixTimeToDate(const uint64_t timestamp)
+{
+    const std::time_t time = timestamp;
+    char buffer[100];
+    std::strftime(buffer, sizeof(buffer), "%F %R", std::localtime(&time));
+    return std::string(buffer);
 }
 
 } // namespace Utilities

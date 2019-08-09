@@ -107,9 +107,12 @@ const uint64_t MAX_EXTRA_SIZE                                = 140000;
 const uint64_t MAX_EXTRA_SIZE_V2                             = 1024;
 const uint64_t MAX_EXTRA_SIZE_V2_HEIGHT                      = 700000;
 
-/* For new projects forked from this code base, this value should be
-   changed to 0 to prevent a possible transaction bloat exploit */
+/* This describes how many blocks of "wiggle" room transactions have regarding
+   when the outputs can be spent based on a reasonable belief that the outputs
+   would unlock in the current block period */
 const uint64_t TRANSACTION_SIGNATURE_COUNT_VALIDATION_HEIGHT = 700000;
+const uint64_t BLOCK_BLOB_SHUFFLE_CHECK_HEIGHT               = 1800000;
+const uint64_t TRANSACTION_INPUT_BLOCKTIME_VALIDATION_HEIGHT = 1800000;
 
 const uint64_t CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_BLOCKS     = 1;
 const uint64_t CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_SECONDS    = DIFFICULTY_TARGET * CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_BLOCKS;
@@ -214,10 +217,10 @@ const uint64_t P2P_DEFAULT_INVOKE_TIMEOUT                    = 60 * 2 * 1000; //
 const size_t   P2P_DEFAULT_HANDSHAKE_INVOKE_TIMEOUT          = 5000;          // 5 seconds
 const char     P2P_STAT_TRUSTED_PUB_KEY[]                    = "";
 
-const uint64_t DATABASE_WRITE_BUFFER_MB_DEFAULT_SIZE         = 256;
-const uint64_t DATABASE_READ_BUFFER_MB_DEFAULT_SIZE          = 10;
-const uint32_t DATABASE_DEFAULT_MAX_OPEN_FILES               = 100;
-const uint16_t DATABASE_DEFAULT_BACKGROUND_THREADS_COUNT     = 2;
+const uint64_t DATABASE_WRITE_BUFFER_MB_DEFAULT_SIZE         = 1024;          // 1 GB 
+const uint64_t DATABASE_READ_BUFFER_MB_DEFAULT_SIZE          = 1024;          // 1 GB
+const uint32_t DATABASE_DEFAULT_MAX_OPEN_FILES               = 500;           // 500 files
+const uint16_t DATABASE_DEFAULT_BACKGROUND_THREADS_COUNT     = 10;            // 10 DB threads
 
 const char     LATEST_VERSION_URL[]                          = "https://github.com/derogold/derogold/releases";
 const std::string LICENSE_URL                                = "https://github.com/derogold/derogold/blob/master/LICENSE";

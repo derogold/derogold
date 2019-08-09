@@ -8,8 +8,10 @@
 
 #include <iostream>
 
-#include <zedwallet++/AddressBook.h>
 #include <Utilities/ColouredMsg.h>
+#include <Utilities/Input.h>
+
+#include <zedwallet++/AddressBook.h>
 #include <zedwallet++/CommandImplementations.h>
 #include <zedwallet++/Open.h>
 #include <zedwallet++/Transfer.h>
@@ -105,7 +107,7 @@ bool handleCommand(
                      "send large amounts at once.\n"
                   << WarningMsg("This may take a very long time!\n");
 
-        if (!ZedUtilities::confirm("Do you want to proceed?"))
+        if (!Utilities::confirm("Do you want to proceed?"))
         {
             std::cout << WarningMsg("Cancelling optimization.") << std::endl;
         }
@@ -139,6 +141,10 @@ bool handleCommand(
 
         transfer(walletBackend, sendAll);
     }
+    else if (command == "set_log_level")
+    {
+        setLogLevel();
+    }
     else if (command == "status")
     {
         status(walletBackend);
@@ -158,7 +164,7 @@ bool handleCommand(
 
 std::shared_ptr<WalletBackend> handleLaunchCommand(
     const std::string launchCommand,
-    const Config &config)
+    const ZedConfig &config)
 {
     if (launchCommand == "create")
     {

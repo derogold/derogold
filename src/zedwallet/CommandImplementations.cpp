@@ -13,7 +13,7 @@
 #include <config/WalletConfig.h>
 
 #include <CryptoNoteCore/Account.h>
-#include <CryptoNoteCore/TransactionExtra.h>
+#include <Common/TransactionExtra.h>
 
 #ifndef MSVC
 #include <fstream>
@@ -21,10 +21,11 @@
 
 #include <Mnemonics/Mnemonics.h>
 
+#include <Utilities/ColouredMsg.h>
 #include <Utilities/FormatTools.h>
+#include <Utilities/ParseExtra.h>
 
 #include <zedwallet/AddressBook.h>
-#include <Utilities/ColouredMsg.h>
 #include <zedwallet/Commands.h>
 #include <zedwallet/Fusion.h>
 #include <zedwallet/Menu.h>
@@ -78,7 +79,7 @@ void printPrivateKeys(CryptoNote::WalletGreen &wallet, bool viewWallet)
 
     Crypto::SecretKey derivedPrivateViewKey;
 
-    CryptoNote::AccountBase::generateViewFromSpend(privateSpendKey,
+    Crypto::crypto_ops::generateViewFromSpend(privateSpendKey,
                                                    derivedPrivateViewKey);
 
     const bool deterministicPrivateKeys
@@ -283,7 +284,7 @@ void printPeerCount(size_t peerCount)
               << std::endl;
 }
 
-void printHashrate(uint64_t difficulty, uint64_t remoteHeight)
+void printHashrate(uint64_t difficulty)
 {
     /* Offline node / not responding */
     if (difficulty == 0)
@@ -292,16 +293,9 @@ void printHashrate(uint64_t difficulty, uint64_t remoteHeight)
     }
 
     /* Hashrate is difficulty divided by block target time */
-    uint64_t hashrate;
-
-    if (remoteHeight >= CryptoNote::parameters::DIFFICULTY_TARGET_V2_HEIGHT)
-    {
-        hashrate = difficulty / CryptoNote::parameters::DIFFICULTY_TARGET_V2;
-    }
-    else
-    {
-        hashrate = difficulty / CryptoNote::parameters::DIFFICULTY_TARGET;
-    }
+    uint32_t hashrate = static_cast<uint32_t>(
+        round(difficulty / CryptoNote::parameters::DIFFICULTY_TARGET)
+    );
 
     std::cout << "Network hashrate: "
               << SuccessMsg(Utilities::get_mining_speed(hashrate))
@@ -328,7 +322,7 @@ void status(CryptoNote::INode &node, CryptoNote::WalletGreen &wallet)
     std::cout << std::endl;
 
     /* Print the network hashrate, based on the last local block */
-    printHashrate(node.getLastLocalBlockHeaderInfo().difficulty, remoteHeight);
+    printHashrate(node.getLastLocalBlockHeaderInfo().difficulty);
 
     /* Print the amount of peers we have */
     printPeerCount(node.getPeerCount());
@@ -442,7 +436,7 @@ void printOutgoingTransfer(CryptoNote::WalletTransaction t,
               << WarningMsg("Total Spent: " + formatAmount(-t.totalAmount))
               << std::endl;
 
-    const std::string paymentID = getPaymentIDFromExtra(t.extra);
+    const std::string paymentID = Utilities::getPaymentIDFromExtra(Common::asBinaryArray(t.extra));
 
     if (paymentID != "")
     {
@@ -474,7 +468,7 @@ void printIncomingTransfer(CryptoNote::WalletTransaction t,
     std::cout << SuccessMsg("Amount: " + formatAmount(t.totalAmount))
               << std::endl;
 
-    const std::string paymentID = getPaymentIDFromExtra(t.extra);
+    const std::string paymentID = Utilities::getPaymentIDFromExtra(Common::asBinaryArray(t.extra));
 
     if (paymentID != "")
     {

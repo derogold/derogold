@@ -31,7 +31,7 @@ void printSyncSummary(uint32_t localHeight, uint32_t remoteHeight,
 
 void printPeerCount(size_t peerCount);
 
-void printHashrate(uint64_t difficulty, uint64_t remoteHeight);
+void printHashrate(uint64_t difficulty);
 
 void balance(CryptoNote::INode &node, CryptoNote::WalletGreen &wallet,
              bool viewWallet);

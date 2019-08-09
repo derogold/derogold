@@ -21,7 +21,7 @@
 #include <unordered_map>
 
 #include "ITransfersContainer.h"
-#include "IWallet.h"
+#include "WalletGreenTypes.h"
 
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/ordered_index.hpp>
