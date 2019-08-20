@@ -130,10 +130,10 @@ endif ()
 #
 # Edit these 4 lines to define paths to ZLIB
 #
-set(ZLIB_HOME $ENV{THIRDPARTY_HOME}/ZLIB.Library)
-set(ZLIB_INCLUDE ${ZLIB_HOME}/build/native/inc/inc)
-set(ZLIB_LIB_DEBUG ${ZLIB_HOME}/lib/native/debug/amd64/zlib.lib)
-set(ZLIB_LIB_RELEASE ${ZLIB_HOME}/lib/native/retail/amd64/zlib.lib)
+#set(ZLIB_HOME $ENV{THIRDPARTY_HOME}/ZLIB.Library)
+#set(ZLIB_INCLUDE ${ZLIB_HOME}/build/native/inc/inc)
+#set(ZLIB_LIB_DEBUG ${ZLIB_HOME}/lib/native/debug/amd64/zlib.lib)
+#set(ZLIB_LIB_RELEASE ${ZLIB_HOME}/lib/native/retail/amd64/zlib.lib)
 
 # For compatibilty
 if (ZLIB)
