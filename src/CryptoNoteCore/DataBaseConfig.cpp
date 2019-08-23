@@ -21,22 +21,24 @@ DataBaseConfig::DataBaseConfig() :
   backgroundThreadsCount(DATABASE_DEFAULT_BACKGROUND_THREADS_COUNT),
   maxOpenFiles(DATABASE_DEFAULT_MAX_OPEN_FILES),
   writeBufferSize(DATABASE_WRITE_BUFFER_MB_DEFAULT_SIZE * MEGABYTE),
+  MaxByteLevelSize(DATABASE_MAX_BYTES_FOR_LEVEL_BASE * MEGABYTE),
   readCacheSize(DATABASE_READ_BUFFER_MB_DEFAULT_SIZE * MEGABYTE),
   testnet(false),
   configFolderDefaulted(false),
-  compressionEnabled(false) {
+  compressionEnabled(true) {
 }
 
 bool DataBaseConfig::init(
     const std::string dataDirectory, const int backgroundThreads, 
-    const int openFiles, const int writeBufferMB, const int readCacheMB,
-    const bool enableDbCompression
+    const int openFiles, const int writeBufferMB, const int MaxByteLevelSizeMB, 
+	const int readCacheMB, const bool enableDbCompression
     )
 {
   dataDir = dataDirectory;
   backgroundThreadsCount = backgroundThreads;
   maxOpenFiles = openFiles;
   writeBufferSize = writeBufferMB * MEGABYTE;
+  MaxByteLevelSize = MaxByteLevelSizeMB * MEGABYTE;
   readCacheSize = readCacheMB * MEGABYTE;
   compressionEnabled = enableDbCompression;
 
@@ -66,6 +68,10 @@ uint32_t DataBaseConfig::getMaxOpenFiles() const {
 
 uint64_t DataBaseConfig::getWriteBufferSize() const {
   return writeBufferSize;
+}
+
+uint64_t DataBaseConfig::getMaxByteLevelSize() const {
+  return MaxByteLevelSize;
 }
 
 uint64_t DataBaseConfig::getReadCacheSize() const {

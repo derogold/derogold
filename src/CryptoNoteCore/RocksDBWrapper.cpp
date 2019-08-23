@@ -192,10 +192,10 @@ rocksdb::Options RocksDBWrapper::getDBOptions(const DataBaseConfig& config) {
   fOptions.level0_slowdown_writes_trigger = 30;
   fOptions.level0_stop_writes_trigger = 40;
 
-  // doesn't really matter much, but we don't want to create too many files
-  fOptions.target_file_size_base = config.getWriteBufferSize() / 10;
   // make Level1 size equal to Level0 size, so that L0->L1 compactions are fast
-  fOptions.max_bytes_for_level_base = config.getWriteBufferSize();
+  fOptions.max_bytes_for_level_base = config.getMaxByteLevelSize();
+  // doesn't really matter much, but we don't want to create too many files
+  fOptions.target_file_size_base = config.getMaxByteLevelSize() / 10;
   fOptions.num_levels = 10;
   fOptions.target_file_size_multiplier = 2;
   // level style compaction

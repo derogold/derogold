@@ -258,6 +258,7 @@ int main(int argc, char* argv[])
       config.dbThreads,
       config.dbMaxOpenFiles,
       config.dbWriteBufferSizeMB,
+      config.dbMaxByteLevelSizeMB,
       config.dbReadCacheSizeMB,
       config.enableDbCompression
     );

@@ -87,7 +87,8 @@ namespace DaemonConfig{
       ("db-max-open-files", "Number of files that can be used by the database at one time", cxxopts::value<int>()->default_value(std::to_string(config.dbMaxOpenFiles)), "#")
       ("db-read-buffer-size", "Size of the database read cache in megabytes (MB)", cxxopts::value<int>()->default_value(std::to_string(config.dbReadCacheSizeMB)), "#")
       ("db-threads", "Number of background threads used for compaction and flush operations", cxxopts::value<int>()->default_value(std::to_string(config.dbThreads)), "#")
-      ("db-write-buffer-size", "Size of the database write buffer in megabytes (MB)", cxxopts::value<int>()->default_value(std::to_string(config.dbWriteBufferSizeMB)), "#");
+      ("db-write-buffer-size", "Size of the database write buffer in megabytes (MB)", cxxopts::value<int>()->default_value(std::to_string(config.dbWriteBufferSizeMB)), "#")
+      ("db-max-bytes-for-level-base", "Size of the database max level base in megabytes (MB)", cxxopts::value<int>()->default_value(std::to_string(config.dbMaxByteLevelSizeMB)), "#");
 
     try
     {
@@ -207,7 +208,10 @@ namespace DaemonConfig{
       {
         config.dbWriteBufferSizeMB = cli["db-write-buffer-size"].as<int>();
       }
-
+      if (cli.count("db-max-bytes-for-level-base") > 0)
+      {
+        config.dbWriteBufferSizeMB = cli["db-max-bytes-for-level-base"].as<int>();
+      }
       if (cli.count("local-ip") > 0)
       {
         config.localIp = cli["local-ip"].as<bool>();
@@ -445,6 +449,18 @@ namespace DaemonConfig{
             throw std::runtime_error(std::string(e.what()) + " - Invalid value for " + cfgKey );
           }
         }
+        else if (cfgKey.compare("db-max-bytes-for-level-base") == 0)
+        {
+          try
+          {
+            config.dbMaxByteLevelSizeMB = std::stoi(cfgValue);
+            updated = true;
+          }
+          catch(std::exception& e)
+          {
+            throw std::runtime_error(std::string(e.what()) + " - Invalid value for " + cfgKey );
+          }
+        }
         else if (cfgKey.compare("allow-local-ip") == 0)
         {
           config.localIp =  cfgValue.at(0) == '1';
@@ -665,6 +681,11 @@ namespace DaemonConfig{
       config.dbWriteBufferSizeMB = j["db-write-buffer-size"].GetInt();
     }
 
+    if (j.HasMember("db-max-bytes-for-level-base"))
+    {
+      config.dbMaxByteLevelSizeMB = j["db-max-bytes-for-level-base"].GetInt();
+    }
+
     if (j.HasMember("allow-local-ip"))
     {
       config.localIp = j["allow-local-ip"].GetBool();
@@ -784,6 +805,7 @@ namespace DaemonConfig{
     j.AddMember("db-read-buffer-size", (config.dbReadCacheSizeMB), alloc);
     j.AddMember("db-threads", config.dbThreads, alloc);
     j.AddMember("db-write-buffer-size", (config.dbWriteBufferSizeMB), alloc);
+    j.AddMember("db-max-bytes-for-level-base", (config.dbMaxByteLevelSizeMB), alloc);
     j.AddMember("allow-local-ip", config.localIp, alloc);
     j.AddMember("hide-my-port", config.hideMyPort, alloc);
     j.AddMember("p2p-bind-ip", config.p2pInterface, alloc);

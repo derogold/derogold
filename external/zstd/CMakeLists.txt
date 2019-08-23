@@ -76,7 +76,7 @@ SET(Headers
         ${LIBRARY_DIR}/deprecated/zbuff.h)
 
 IF (MSVC)
-    SET(MSVC_RESOURCE_DIR ${ZSTD_SOURCE_DIR}/build/VS2010/libzstd-dll)
+    SET(MSVC_RESOURCE_DIR ${Sources}/build/VS2010/libzstd-dll)
     SET(PlatformDependResources ${MSVC_RESOURCE_DIR}/libzstd-dll.rc)
 ENDIF (MSVC)
 

@@ -38,16 +38,16 @@ namespace CryptoNote
         
         /* setup column family options */
         rocksdb::ColumnFamilyOptions cfOpts;
-        cfOpts.target_file_size_base = 64 * 1024 * 1024;
-        cfOpts.max_bytes_for_level_base = config.getWriteBufferSize();
+        cfOpts.target_file_size_base = 32 * 1024 * 1024;
+        cfOpts.max_bytes_for_level_base = config.getMaxByteLevelSize();
         cfOpts.target_file_size_multiplier = 2;
         cfOpts.level0_file_num_compaction_trigger = 20;
         cfOpts.level0_slowdown_writes_trigger = 30;
         cfOpts.level0_stop_writes_trigger = 40;
-        cfOpts.write_buffer_size = 512 * 1024 * 1024;
+        cfOpts.write_buffer_size = config.getWriteBufferSize();
         cfOpts.min_write_buffer_number_to_merge = 2;
         cfOpts.max_write_buffer_number = 6;
-        cfOpts.num_levels = 9;
+        cfOpts.num_levels = 10;
 		cfOpts.level_compaction_dynamic_level_bytes=true;
         cfOpts.compaction_style = rocksdb::kCompactionStyleLevel;
         
@@ -56,7 +56,7 @@ namespace CryptoNote
         cfOpts.bottommost_compression = config.getCompressionEnabled() ? rocksdb::kZSTD : rocksdb::kNoCompression;
         
         rocksdb::BlockBasedTableOptions tblOpts;
-        tblOpts.block_cache = rocksdb::NewLRUCache(128 * 1024 * 1024);
+        tblOpts.block_cache = rocksdb::NewLRUCache(64 * 1024 * 1024);
         std::shared_ptr<rocksdb::TableFactory> tf(NewBlockBasedTableFactory(tblOpts));
         cfOpts.table_factory = tf;
         

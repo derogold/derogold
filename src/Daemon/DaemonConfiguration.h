@@ -29,6 +29,7 @@ namespace DaemonConfig {
       dbReadCacheSizeMB = CryptoNote::DATABASE_READ_BUFFER_MB_DEFAULT_SIZE;
       dbThreads = CryptoNote::DATABASE_DEFAULT_BACKGROUND_THREADS_COUNT;
       dbWriteBufferSizeMB = CryptoNote::DATABASE_WRITE_BUFFER_MB_DEFAULT_SIZE;
+      dbMaxByteLevelSizeMB = CryptoNote::DATABASE_MAX_BYTES_FOR_LEVEL_BASE;
       rewindToHeight = 0;
       p2pInterface = "0.0.0.0";
       p2pPort = CryptoNote::P2P_DEFAULT_PORT;
@@ -72,6 +73,7 @@ namespace DaemonConfig {
     int dbThreads;
     int dbMaxOpenFiles;
     int dbWriteBufferSizeMB;
+    int dbMaxByteLevelSizeMB;
     int dbReadCacheSizeMB;
 
     uint32_t rewindToHeight;
