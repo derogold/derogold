@@ -35,7 +35,9 @@ namespace CryptoNote
         dbOpts.max_open_files = -1;
         dbOpts.keep_log_file_num = 3;
         dbOpts.recycle_log_file_num = 2;
-        
+        // Default: 16 in rocksdb
+        dbOpts.max_file_opening_threads = 32;
+
         /* setup column family options */
         rocksdb::ColumnFamilyOptions cfOpts;
         cfOpts.target_file_size_base = 32 * 1024 * 1024;
@@ -50,7 +52,7 @@ namespace CryptoNote
         cfOpts.num_levels = 10;
 		cfOpts.level_compaction_dynamic_level_bytes=true;
         cfOpts.compaction_style = rocksdb::kCompactionStyleLevel;
-        
+
         const auto compressionLevel = config.getCompressionEnabled() ? rocksdb::kZSTD : rocksdb::kNoCompression; //kLZ4Compression
         std::fill_n(std::back_inserter(cfOpts.compression_per_level), cfOpts.num_levels, compressionLevel);
         cfOpts.bottommost_compression = config.getCompressionEnabled() ? rocksdb::kZSTD : rocksdb::kNoCompression;

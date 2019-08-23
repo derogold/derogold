@@ -176,7 +176,9 @@ rocksdb::Options RocksDBWrapper::getDBOptions(const DataBaseConfig& config) {
   dbOptions.IncreaseParallelism(config.getBackgroundThreadsCount());
   dbOptions.info_log_level = rocksdb::InfoLogLevel::WARN_LEVEL;
   dbOptions.max_open_files = config.getMaxOpenFiles();
-  
+  // Default: 16 in rocksdb
+  dbOptions.max_file_opening_threads = 32;
+
   rocksdb::ColumnFamilyOptions fOptions;
   fOptions.write_buffer_size = static_cast<size_t>(config.getWriteBufferSize());
   // merge two memtables when flushing to L0
@@ -198,6 +200,7 @@ rocksdb::Options RocksDBWrapper::getDBOptions(const DataBaseConfig& config) {
   fOptions.target_file_size_base = config.getMaxByteLevelSize() / 10;
   fOptions.num_levels = 10;
   fOptions.target_file_size_multiplier = 2;
+
   // level style compaction
   fOptions.compaction_style = rocksdb::kCompactionStyleLevel;
 
