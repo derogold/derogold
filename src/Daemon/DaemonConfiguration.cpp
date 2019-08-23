@@ -210,7 +210,7 @@ namespace DaemonConfig{
       }
       if (cli.count("db-max-bytes-for-level-base") > 0)
       {
-        config.dbWriteBufferSizeMB = cli["db-max-bytes-for-level-base"].as<int>();
+        config.dbMaxByteLevelSizeMB = cli["db-max-bytes-for-level-base"].as<int>();
       }
       if (cli.count("local-ip") > 0)
       {
