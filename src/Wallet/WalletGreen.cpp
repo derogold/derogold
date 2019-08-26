@@ -3939,7 +3939,7 @@ std::string WalletGreen::toNewFormatJSON() const
                         /* Height to begin syncing at - Always stored as timestamp
                            in WalletGreen so static at 0 */
                         writer.Key("syncStartHeight");
-                        writer.Uint64(Utilities::timestampToScanHeight(subWallet.creationTimestamp));
+                        writer.Uint64(0); // TODO timestamp to height
 
                         writer.Key("isPrimaryAddress");
                         writer.Bool(address == primaryAddress);
@@ -4048,7 +4048,7 @@ std::string WalletGreen::toNewFormatJSON() const
             writer.Uint64(0);
 
             writer.Key("startHeight");
-            writer.Uint64(Utilities::timestampToScanHeight(getMinTimestamp()));
+            writer.Uint64(0); // TODO timestamp to height
 
             /* The private view key */
             writer.Key("privateViewKey");
