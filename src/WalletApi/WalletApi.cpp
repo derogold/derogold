@@ -4,21 +4,26 @@
 
 #include <atomic>
 
+#include <chrono>
+
 #include <Common/SignalHandler.h>
 
 #include <config/CliHeader.h>
 
 #include <iostream>
 
+#include <Logger/Logger.h>
+
 #include <thread>
-#include <chrono>
 
 #include <WalletApi/ApiDispatcher.h>
 #include <WalletApi/ParseArguments.h>
 
 int main(int argc, char **argv)
 {
-    Config config = parseArguments(argc, argv);
+    ApiConfig config = parseArguments(argc, argv);
+
+    Logger::logger.setLogLevel(config.logLevel);
 
     std::cout << CryptoNote::getProjectCLIHeader() << std::endl;
 
@@ -36,7 +41,7 @@ int main(int argc, char **argv)
         /* Init the API */
         api = std::make_shared<ApiDispatcher>(
             config.port, config.rpcBindIp, config.rpcPassword,
-            config.corsHeader
+            config.corsHeader, config.threads
         );
 
         /* Launch the API */

@@ -9,7 +9,6 @@
 #include <System/ContextGroup.h>
 #include <System/Dispatcher.h>
 #include <System/Event.h>
-#include "IWallet.h"
 #include "INode.h"
 #include "CryptoNoteCore/Currency.h"
 #include "PaymentServiceJsonRpcMessages.h"
@@ -21,6 +20,7 @@
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/member.hpp>
 #include <boost/multi_index/hashed_index.hpp>
+#include <Wallet/WalletGreen.h>
 
 namespace CryptoNote {
 class IFusionManager;
@@ -44,7 +44,7 @@ struct TransactionsInBlockInfoFilter;
 
 class WalletService {
 public:
-  WalletService(const CryptoNote::Currency& currency, System::Dispatcher& sys, CryptoNote::INode& node, CryptoNote::IWallet& wallet,
+  WalletService(const CryptoNote::Currency& currency, System::Dispatcher& sys, CryptoNote::INode& node, CryptoNote::WalletGreen& wallet,
     CryptoNote::IFusionManager& fusionManager, const WalletConfiguration& conf, std::shared_ptr<Logging::ILogger> logger);
   virtual ~WalletService();
 
@@ -108,7 +108,7 @@ private:
   std::vector<TransactionsInBlockRpcInfo> getRpcTransactions(uint32_t firstBlockIndex, size_t blockCount, const TransactionsInBlockInfoFilter& filter) const;
 
   const CryptoNote::Currency& currency;
-  CryptoNote::IWallet& wallet;
+  CryptoNote::WalletGreen &wallet;
   CryptoNote::IFusionManager& fusionManager;
   CryptoNote::INode& node;
   const WalletConfiguration& config;

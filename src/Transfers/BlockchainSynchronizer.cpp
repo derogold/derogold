@@ -799,4 +799,28 @@ SynchronizationState* BlockchainSynchronizer::getConsumerSynchronizationState(IB
   return it->second.get();
 }
 
+std::vector<Crypto::Hash> BlockchainSynchronizer::getLastKnownBlockHashes() const
+{
+    std::unique_lock<std::mutex> lk(m_consumersMutex);
+
+    if (m_consumers.empty())
+    {
+        return {};
+    }
+
+    auto shortest = m_consumers.begin();
+    auto it = shortest;
+    ++it;
+
+    for (; it != m_consumers.end(); ++it)
+    {
+        if (it->second->getHeight() < shortest->second->getHeight())
+        {
+            shortest = it;
+        }
+    }
+
+    return shortest->second->getShortHistory(m_node.getLastLocalBlockHeight());
+}
+
 }

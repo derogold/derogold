@@ -1,5 +1,5 @@
 // Copyright (c) 2018, The TurtleCoin Developers
-// 
+//
 // Please see the included LICENSE file for more information.
 
 #pragma once
@@ -13,6 +13,7 @@
 
 #include <unordered_map>
 #include <optional>
+#include <string>
 
 namespace WalletTypes
 {
@@ -27,8 +28,8 @@ namespace WalletTypes
     };
 
     /* A coinbase transaction (i.e., a miner reward, there is one of these in
-       every block). Coinbase transactions have no inputs. 
-       
+       every block). Coinbase transactions have no inputs.
+
        We call this a raw transaction, because it is simply key images and
        amounts */
     struct RawCoinbaseTransaction
@@ -48,6 +49,14 @@ namespace WalletTypes
            CRYPTONOTE_MAX_BLOCK_NUMBER (In cryptonoteconfig) it is treated
            as a unix timestamp, else it is treated as a block height. */
         uint64_t unlockTime;
+
+        size_t memoryUsage() const
+        {
+            return keyOutputs.size() * sizeof(KeyOutput) + sizeof(keyOutputs) +
+                   sizeof(hash) +
+                   sizeof(transactionPublicKey) +
+                   sizeof(unlockTime);
+        }
     };
 
     /* A raw transaction, simply key images and amounts */
@@ -59,13 +68,21 @@ namespace WalletTypes
         /* The inputs used for a transaction, can be used to track outgoing
            transactions */
         std::vector<CryptoNote::KeyInput> keyInputs;
+
+        size_t memoryUsage() const
+        {
+            return paymentID.size() * sizeof(char) + sizeof(paymentID) +
+                   keyInputs.size() * sizeof(CryptoNote::KeyInput) + sizeof(keyInputs) +
+                   RawCoinbaseTransaction::memoryUsage();
+        }
     };
 
     /* A 'block' with the very basics needed to sync the transactions */
     struct WalletBlockInfo
     {
-        /* The coinbase transaction */
-        RawCoinbaseTransaction coinbaseTransaction;
+        /* The coinbase transaction. Optional, since we can skip fetching
+           coinbase transactions from daemon. */
+        std::optional<RawCoinbaseTransaction> coinbaseTransaction;
 
         /* The transactions in the block */
         std::vector<RawTransaction> transactions;
@@ -78,6 +95,26 @@ namespace WalletTypes
 
         /* The timestamp of the block */
         uint64_t blockTimestamp;
+
+        size_t memoryUsage() const
+        {
+            const size_t txUsage = std::accumulate(
+                transactions.begin(),
+                transactions.end(),
+                sizeof(transactions),
+                [](const auto acc, const auto item) {
+
+                return acc + item.memoryUsage();
+            });
+            
+            return coinbaseTransaction 
+                        ? coinbaseTransaction->memoryUsage() 
+                        : sizeof(coinbaseTransaction) +
+                   txUsage +
+                   sizeof(blockHeight) +
+                   sizeof(blockHash) +
+                   sizeof(blockTimestamp);
+        }
     };
 
     struct TransactionInput
@@ -105,7 +142,7 @@ namespace WalletTypes
 
         /* The transaction key we took from the key outputs */
         Crypto::PublicKey key;
-        
+
         /* If spent, what height did we spend it at. Used to remove spent
            transaction inputs once they are sure to not be removed from a
            forked chain. */
@@ -309,8 +346,8 @@ namespace WalletTypes
             /* A map of public keys to amounts, since one transaction can go to
                multiple addresses. These can be positive or negative, for example
                one address might have sent 10,000 TRTL (-10000) to two recipients
-               (+5000), (+5000) 
-               
+               (+5000), (+5000)
+
                All the public keys in this map, are ones that the wallet container
                owns, it won't store amounts belonging to random people */
             std::unordered_map<Crypto::PublicKey, int64_t> transfers;
@@ -460,20 +497,48 @@ namespace WalletTypes
         }
     };
 
+    struct TopBlock
+    {
+        Crypto::Hash hash;
+        uint64_t height;
+    };
+
+    inline void to_json(nlohmann::json &j, const TopBlock &t)
+    {
+        j = {
+            {"hash", t.hash},
+            {"height", t.height}
+        };
+    }
+
+    inline void from_json(const nlohmann::json &j, TopBlock &t)
+    {
+        t.hash = j.at("hash").get<Crypto::Hash>();
+        t.height = j.at("height").get<uint64_t>();
+    }
+
     inline void to_json(nlohmann::json &j, const WalletBlockInfo &w)
     {
         j = {
-            {"coinbaseTX", w.coinbaseTransaction},
             {"transactions", w.transactions},
             {"blockHeight", w.blockHeight},
             {"blockHash", w.blockHash},
             {"blockTimestamp", w.blockTimestamp}
         };
+
+        if (w.coinbaseTransaction)
+        {
+            j["coinbaseTX"] = *(w.coinbaseTransaction);
+        }
     }
 
     inline void from_json(const nlohmann::json &j, WalletBlockInfo &w)
     {
-        w.coinbaseTransaction = j.at("coinbaseTX").get<RawCoinbaseTransaction>();
+        if (j.find("coinbaseTX") != j.end())
+        {
+            w.coinbaseTransaction = j.at("coinbaseTX").get<RawCoinbaseTransaction>();
+        }
+
         w.transactions = j.at("transactions").get<std::vector<RawTransaction>>();
         w.blockHeight = j.at("blockHeight").get<uint64_t>();
         w.blockHash = j.at("blockHash").get<Crypto::Hash>();
@@ -495,7 +560,19 @@ namespace WalletTypes
         r.keyOutputs = j.at("outputs").get<std::vector<KeyOutput>>();
         r.hash = j.at("hash").get<Crypto::Hash>();
         r.transactionPublicKey = j.at("txPublicKey").get<Crypto::PublicKey>();
-        r.unlockTime = j.at("unlockTime").get<uint64_t>();
+
+        /* We need to try to get the unlockTime from an integer in the json
+           however, if that fails because we're talking to a blockchain
+           cache API that encodes unlockTime as a string (due to json
+           integer encoding limits), we need to attempt this as a string */
+        try
+        {
+            r.unlockTime = j.at("unlockTime").get<uint64_t>();
+        }
+        catch (const nlohmann::json::exception &e)
+        {
+            r.unlockTime = std::stoull(j.at("unlockTime").get<std::string>());
+        }
     }
 
     inline void to_json(nlohmann::json &j, const RawTransaction &r)
@@ -515,7 +592,19 @@ namespace WalletTypes
         r.keyOutputs = j.at("outputs").get<std::vector<KeyOutput>>();
         r.hash = j.at("hash").get<Crypto::Hash>();
         r.transactionPublicKey = j.at("txPublicKey").get<Crypto::PublicKey>();
-        r.unlockTime = j.at("unlockTime").get<uint64_t>();
+
+        /* We need to try to get the unlockTime from an integer in the json
+           however, if that fails because we're talking to a blockchain
+           cache API that encodes unlockTime as a string (due to json
+           integer encoding limits), we need to attempt this as a string */
+        try
+        {
+            r.unlockTime = j.at("unlockTime").get<uint64_t>();
+        }
+        catch (const nlohmann::json::exception &e)
+        {
+            r.unlockTime = std::stoull(j.at("unlockTime").get<std::string>());
+        }
         r.paymentID = j.at("paymentID").get<std::string>();
         r.keyInputs = j.at("inputs").get<std::vector<CryptoNote::KeyInput>>();
     }
@@ -532,6 +621,15 @@ namespace WalletTypes
     {
         k.key = j.at("key").get<Crypto::PublicKey>();
         k.amount = j.at("amount").get<uint64_t>();
+
+        /* If we're talking to a daemon or blockchain cache
+           that returns the globalIndex as part of the structure
+           of a key output, then we need to load that into the
+           data structure. */
+        if (j.find("globalIndex") != j.end())
+        {
+            k.globalOutputIndex = j.at("globalIndex").get<uint64_t>();
+        }
     }
 
     inline void to_json(nlohmann::json &j, const UnconfirmedInput &u)

@@ -19,7 +19,7 @@
 
 #include <boost/filesystem.hpp>
 
-#include "CryptoNoteTools.h"
+#include "Common/CryptoNoteTools.h"
 
 namespace CryptoNote {
 
@@ -41,6 +41,13 @@ void MainChainStorage::pushBlock(const RawBlock& rawBlock) {
 
 void MainChainStorage::popBlock() {
   storage.pop_back();
+}
+
+void MainChainStorage::rewindTo(const uint32_t index) const
+{
+  while(getBlockCount() >= index) {
+      storage.pop_back();
+  }
 }
 
 RawBlock MainChainStorage::getBlockByIndex(uint32_t index) const {
