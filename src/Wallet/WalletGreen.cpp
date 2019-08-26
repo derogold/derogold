@@ -361,7 +361,7 @@ void WalletGreen::initWithKeys(const std::string& path, const std::string& passw
   }
   else
   {
-    creationTimestamp = Utilities::Utilities::scanHeightToTimestamp(scanHeight);
+    creationTimestamp = Utilities::scanHeightToTimestamp(scanHeight);
   }
 
   prefix->encryptedViewKeys = encryptKeyPair(viewPublicKey, viewSecretKey, creationTimestamp, m_key, prefix->nextIv);
