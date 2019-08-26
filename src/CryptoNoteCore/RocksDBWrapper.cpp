@@ -190,13 +190,13 @@ rocksdb::Options RocksDBWrapper::getDBOptions(const DataBaseConfig& config) {
 
   fOptions.compression_per_level.resize(fOptions.num_levels);
 
-  const auto compressionLevel = rocksdb::kLZ4Compression;
+  const auto compressionLevel = rocksdb::kZSTD ;
   for (int i = 0; i < fOptions.num_levels; ++i) {
     // don't compress l0 & l1
     fOptions.compression_per_level[i] = (i < 2 ? rocksdb::kNoCompression : compressionLevel);
   }
   // bottom most use lz4hc
-  fOptions.bottommost_compression = rocksdb::kLZ4HCCompression;
+  fOptions.bottommost_compression = rocksdb::kZSTD ;
 
   rocksdb::BlockBasedTableOptions tableOptions;
   tableOptions.block_cache = rocksdb::NewLRUCache(config.getReadCacheSize());
