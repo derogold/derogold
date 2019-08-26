@@ -74,8 +74,6 @@ class SubWallet
 
         std::string address() const;
 
-        bool hasKeyImage(const Crypto::KeyImage keyImage) const;
-
         Crypto::PublicKey publicSpendKey() const;
         
         Crypto::SecretKey privateSpendKey() const;
@@ -86,7 +84,9 @@ class SubWallet
 
         void markInputAsLocked(const Crypto::KeyImage keyImage);
 
-        void removeForkedInputs(const uint64_t forkHeight);
+        std::vector<Crypto::KeyImage> removeForkedInputs(
+            const uint64_t forkHeight,
+            const bool isViewWallet);
 
         void removeCancelledTransactions(const std::unordered_set<Crypto::Hash> cancelledTransactions);
 
@@ -104,6 +104,10 @@ class SubWallet
         void convertSyncTimestampToHeight(
             const uint64_t timestamp,
             const uint64_t height);
+
+        void pruneSpentInputs(const uint64_t pruneHeight);
+
+        std::vector<Crypto::KeyImage> getKeyImages() const;
 
         /////////////////////////////
         /* Public member variables */

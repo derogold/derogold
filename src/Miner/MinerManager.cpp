@@ -4,29 +4,20 @@
 //
 // Please see the included LICENSE file for more information.
 
+/////////////////////////
 #include "MinerManager.h"
+/////////////////////////
 
-#include <System/EventLock.h>
-#include <System/InterruptedException.h>
-#include <System/Timer.h>
-#include <thread>
-#include <chrono>
+#include <Common/CryptoNoteTools.h>
+#include <Common/StringTools.h>
+#include <Common/TransactionExtra.h>
 
-#include "Common/StringTools.h"
 #include <config/CryptoNoteConfig.h>
-#include "CryptoNoteCore/CachedBlock.h"
-#include "CryptoNoteCore/CryptoNoteTools.h"
-#include "CryptoNoteCore/CryptoNoteFormatUtils.h"
-#include "CryptoNoteCore/TransactionExtra.h"
-#include "Rpc/HttpClient.h"
-#include "Rpc/CoreRpcServerCommandsDefinitions.h"
-#include "Rpc/JsonRpc.h"
 
-#include <Utilities/FormatTools.h>
+#include <Miner/BlockUtilities.h>
 
 #include <Utilities/ColouredMsg.h>
-
-using namespace CryptoNote;
+#include <Utilities/FormatTools.h>
 
 using json = nlohmann::json;
 
@@ -48,15 +39,14 @@ MinerEvent BlockchainUpdatedEvent()
     return event;
 }
 
-void adjustMergeMiningTag(BlockTemplate& blockTemplate)
-{
-    CachedBlock cachedBlock(blockTemplate);
 
-    if (blockTemplate.majorVersion >= BLOCK_MAJOR_VERSION_2)
+void adjustMergeMiningTag(CryptoNote::BlockTemplate& blockTemplate)
+{
+    if (blockTemplate.majorVersion >= CryptoNote::BLOCK_MAJOR_VERSION_2)
     {
         CryptoNote::TransactionExtraMergeMiningTag mmTag;
         mmTag.depth = 0;
-        mmTag.merkleRoot = cachedBlock.getAuxiliaryBlockHeaderHash();
+        mmTag.merkleRoot = getMerkleRoot(blockTemplate);
 
         blockTemplate.parentBlock.baseTransaction.extra.clear();
         if (!CryptoNote::appendMergeMiningTagToExtra(blockTemplate.parentBlock.baseTransaction.extra, mmTag))
@@ -85,7 +75,7 @@ MinerManager::MinerManager(
 
 void MinerManager::start()
 {
-    BlockMiningParameters params = requestMiningParameters();
+    CryptoNote::BlockMiningParameters params = requestMiningParameters();
     adjustBlockTemplate(params.blockTemplate);
 
     isRunning = true;
@@ -145,7 +135,7 @@ void MinerManager::eventLoop()
                     }
                 }
 
-                BlockMiningParameters params = requestMiningParameters();
+                CryptoNote::BlockMiningParameters params = requestMiningParameters();
                 adjustBlockTemplate(params.blockTemplate);
 
                 startBlockchainMonitoring();
@@ -156,7 +146,7 @@ void MinerManager::eventLoop()
             {
                 stopMining();
                 stopBlockchainMonitoring();
-                BlockMiningParameters params = requestMiningParameters();
+                CryptoNote::BlockMiningParameters params = requestMiningParameters();
                 adjustBlockTemplate(params.blockTemplate);
                 startBlockchainMonitoring();
                 startMining(params);
@@ -226,10 +216,8 @@ void MinerManager::stopBlockchainMonitoring()
     m_blockchainMonitor.stop();
 }
 
-bool MinerManager::submitBlock(const BlockTemplate& minedBlock)
+bool MinerManager::submitBlock(const CryptoNote::BlockTemplate& minedBlock)
 {
-    CachedBlock cachedBlock(minedBlock);
-
     json j = {
         {"jsonrpc", "2.0"},
         {"method", "submitblock"},
@@ -241,7 +229,7 @@ bool MinerManager::submitBlock(const BlockTemplate& minedBlock)
     if (!res || res->status == 200)
     {
         std::cout << SuccessMsg("\nBlock found! Hash: ")
-                  << SuccessMsg(cachedBlock.getBlockHash()) << "\n\n";
+                  << SuccessMsg(getBlockHash(minedBlock)) << "\n\n";
 
         return true;
     }
@@ -252,7 +240,7 @@ bool MinerManager::submitBlock(const BlockTemplate& minedBlock)
     }
 }
 
-BlockMiningParameters MinerManager::requestMiningParameters()
+CryptoNote::BlockMiningParameters MinerManager::requestMiningParameters()
 {
     while (true)
     {
@@ -308,7 +296,7 @@ BlockMiningParameters MinerManager::requestMiningParameters()
                 continue;
             }
 
-            BlockMiningParameters params;
+            CryptoNote::BlockMiningParameters params;
             params.difficulty = j.at("result").at("difficulty").get<uint64_t>();
 
             std::vector<uint8_t> blob = Common::fromHex(

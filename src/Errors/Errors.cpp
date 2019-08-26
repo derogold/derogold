@@ -1,10 +1,12 @@
-// Copyright (c) 2018, The TurtleCoin Developers
+// Copyright (c) 2018-2019, The TurtleCoin Developers
 // 
 // Please see the included LICENSE file for more information.
 
 //////////////////////////
 #include <Errors/Errors.h>
 //////////////////////////
+
+#include <ostream>
 
 std::string Error::getErrorMessage() const
 {
@@ -263,6 +265,18 @@ std::string Error::getErrorMessage() const
         case HASH_INVALID:
         {
             return "The hash given is not a hex string (A-Za-z0-9)";
+        }
+        case NON_INTEGER_GIVEN:
+        {
+            return "The number given is a float, not an integer.";
+        }
+        case INVALID_PUBLIC_KEY:
+        {
+            return "The public key given is not a valid ed25519 public key.";
+        }
+        case INVALID_PRIVATE_KEY:
+        {
+            return "The private key given is not a valid ed25519 public key.";
         }
         /* No default case so the compiler warns us if we missed one */
     }

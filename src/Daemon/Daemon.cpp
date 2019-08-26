@@ -1,6 +1,7 @@
 // Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2018, The TurtleCoin Developers
 // Copyright (c) 2018, The Karai Developers
+// Copyright (c) 2018-2019, The TurtleCoin Developers
+// Copyright (c) 2019, The CyprusCoin Developers
 //
 // Please see the included LICENSE file for more information.
 
@@ -16,12 +17,14 @@
 #include "Common/Util.h"
 #include "Common/FileSystemShim.h"
 #include "crypto/hash.h"
-#include "CryptoNoteCore/CryptoNoteTools.h"
+#include "Common/CryptoNoteTools.h"
 #include "CryptoNoteCore/Core.h"
 #include "CryptoNoteCore/Currency.h"
 #include "CryptoNoteCore/DatabaseBlockchainCache.h"
 #include "CryptoNoteCore/DatabaseBlockchainCacheFactory.h"
 #include "CryptoNoteCore/MainChainStorage.h"
+#include "CryptoNoteCore/MainChainStorageSqlite.h"
+#include "CryptoNoteCore/MainChainStorageRocksdb.h"
 #include "CryptoNoteCore/RocksDBWrapper.h"
 #include "CryptoNoteProtocol/CryptoNoteProtocolHandler.h"
 #include "P2p/NetNode.h"
@@ -47,41 +50,14 @@ using namespace CryptoNote;
 using namespace Logging;
 using namespace DaemonConfig;
 
-void print_genesis_tx_hex(const std::vector<std::string> rewardAddresses, const bool blockExplorerMode, std::shared_ptr<LoggerManager> logManager)
+void print_genesis_tx_hex(const bool blockExplorerMode, std::shared_ptr<LoggerManager> logManager)
 {
-  std::vector<CryptoNote::AccountPublicAddress> rewardTargets;
-
   CryptoNote::CurrencyBuilder currencyBuilder(logManager);
   currencyBuilder.isBlockexplorer(blockExplorerMode);
 
   CryptoNote::Currency currency = currencyBuilder.currency();
 
-  for (const auto& rewardAddress : rewardAddresses)
-  {
-    CryptoNote::AccountPublicAddress address;
-    if (!currency.parseAccountAddressString(rewardAddress, address))
-    {
-      std::cout << "Failed to parse genesis reward address: " << rewardAddress << std::endl;
-      return;
-    }
-    rewardTargets.emplace_back(std::move(address));
-  }
-
-  CryptoNote::Transaction transaction;
-
-  if (rewardTargets.empty())
-  {
-    if (CryptoNote::parameters::GENESIS_BLOCK_REWARD > 0)
-    {
-      std::cout << "Error: Genesis Block Reward Addresses are not defined" << std::endl;
-      return;
-    }
-    transaction = CryptoNote::CurrencyBuilder(logManager).generateGenesisTransaction();
-  }
-  else
-  {
-    transaction = CryptoNote::CurrencyBuilder(logManager).generateGenesisTransaction(rewardTargets);
-  }
+  const auto transaction = CryptoNote::CurrencyBuilder(logManager).generateGenesisTransaction();
 
   std::string transactionHex = Common::toHex(CryptoNote::toBinaryArray(transaction));
   std::cout << getProjectCLIHeader() << std::endl << std::endl
@@ -127,7 +103,7 @@ int main(int argc, char* argv[])
 
   if (config.printGenesisTx) // Do we weant to generate the Genesis Tx?
   {
-    print_genesis_tx_hex(config.genesisAwardAddresses, false, logManager);
+    print_genesis_tx_hex(false, logManager);
     exit(0);
   }
 
@@ -192,12 +168,25 @@ int main(int argc, char* argv[])
   if (config.resync)
   {
     std::error_code ec;
-    fs::remove_all(fs::path(config.dataDirectory), ec);
 
-    if (ec)
+    std::vector<std::string> removablePaths = {
+      config.dataDirectory + "/" + CryptoNote::parameters::CRYPTONOTE_BLOCKS_FILENAME,
+      config.dataDirectory + "/" + CryptoNote::parameters::CRYPTONOTE_BLOCKINDEXES_FILENAME,
+      config.dataDirectory + "/" + CryptoNote::parameters::P2P_NET_DATA_FILENAME,
+      config.dataDirectory + "/" + CryptoNote::parameters::CRYPTONOTE_BLOCKS_FILENAME + ".sqlite3",
+      config.dataDirectory + "/" + CryptoNote::parameters::CRYPTONOTE_BLOCKS_FILENAME + ".rocksdb",
+      config.dataDirectory + "/DB"
+    };
+
+    for (const auto path : removablePaths)
     {
-      std::cout << "Could not delete data directory: " << config.dataDirectory << std::endl;
-      exit(1);
+      fs::remove_all(fs::path(path), ec);
+
+      if (ec)
+      {
+        std::cout << "Could not delete data path: " << path << std::endl;
+        exit(1);
+      }
     }
   }
 
@@ -236,6 +225,16 @@ int main(int argc, char* argv[])
     }
     CryptoNote::Currency currency = currencyBuilder.currency();
 
+    DataBaseConfig dbConfig;
+    dbConfig.init(
+      config.dataDirectory,
+      config.dbThreads,
+      config.dbMaxOpenFiles,
+      config.dbWriteBufferSizeMB,
+      config.dbReadCacheSizeMB,
+      config.enableDbCompression
+    );
+
     /* If we were told to rewind the blockchain to a certain height
        we will remove blocks until we're back at the height specified */
     if (config.rewindToHeight > 0)
@@ -243,14 +242,20 @@ int main(int argc, char* argv[])
       logger(INFO) << "Rewinding blockchain to: " << config.rewindToHeight << std::endl;
       std::unique_ptr<IMainChainStorage> mainChainStorage;
 
+      if (config.useSqliteForLocalCaches)
+      {
+        mainChainStorage = createSwappedMainChainStorageSqlite(config.dataDirectory, currency);
+      }
+      else if (config.useRocksdbForLocalCaches )
+      {
+        mainChainStorage = createSwappedMainChainStorageRocksdb(config.dataDirectory, currency, dbConfig);
+      }
+      else
       {
         mainChainStorage = createSwappedMainChainStorage(config.dataDirectory, currency);
       }
 
-      while(mainChainStorage->getBlockCount() >= config.rewindToHeight)
-      {
-        mainChainStorage->popBlock();
-      }
+      mainChainStorage->rewindTo(config.rewindToHeight);
 
       logger(INFO) << "Blockchain rewound to: " << config.rewindToHeight << std::endl;
     }
@@ -281,10 +286,7 @@ int main(int argc, char* argv[])
     netNodeConfig.init(config.p2pInterface, config.p2pPort, config.p2pExternalPort, config.localIp,
       config.hideMyPort, config.dataDirectory, config.peers,
       config.exclusiveNodes, config.priorityNodes,
-      config.seedNodes);
-
-    DataBaseConfig dbConfig;
-    dbConfig.init(config.dataDirectory, config.dbThreads, config.dbMaxOpenFiles, config.dbWriteBufferSizeMB, config.dbReadCacheSizeMB);
+      config.seedNodes, config.p2pResetPeerstate);
 
     if (!Tools::create_directories_if_necessary(dbConfig.getDataDir()))
     {
@@ -308,13 +310,29 @@ int main(int argc, char* argv[])
 
     System::Dispatcher dispatcher;
     logger(INFO) << "Initializing core...";
+
+    std::unique_ptr<IMainChainStorage> tmainChainStorage;
+    if ( config.useSqliteForLocalCaches )
+    {
+      tmainChainStorage = createSwappedMainChainStorageSqlite(config.dataDirectory, currency);
+    }
+    else if ( config.useRocksdbForLocalCaches )
+    {
+      tmainChainStorage = createSwappedMainChainStorageRocksdb(config.dataDirectory, currency, dbConfig);
+    }
+    else
+    {
+      tmainChainStorage = createSwappedMainChainStorage(config.dataDirectory, currency);
+    }
+
     CryptoNote::Core ccore(
       currency,
       logManager,
       std::move(checkpoints),
       dispatcher,
       std::unique_ptr<IBlockchainCacheFactory>(new DatabaseBlockchainCacheFactory(database, logger.getLogger())),
-      createSwappedMainChainStorage(config.dataDirectory, currency));
+      std::move(tmainChainStorage)
+    );
 
     ccore.load();
     logger(INFO) << "Core initialized OK";

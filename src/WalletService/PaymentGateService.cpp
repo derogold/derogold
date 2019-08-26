@@ -159,14 +159,20 @@ void PaymentGateService::runWalletService(const CryptoNote::Currency& currency, 
     return;
   }
 
-  if (config.serviceConfig.printAddresses) {
-    // print addresses and exit
-    std::vector<std::string> addresses;
-    service->getAddresses(addresses);
-    for (const auto& address: addresses) {
-      std::cout << "Address: " << address << std::endl;
+    if (config.serviceConfig.printAddresses)
+    {
+        // print addresses and exit
+        std::vector<std::string> addresses;
+        service->getAddresses(addresses);
+
+        for (const auto& address: addresses)
+        {
+            std::cout << "Address: " << address << std::endl;
+        }
+
+        return;
     }
-  } else {
+
     PaymentService::PaymentServiceJsonRpcServer rpcServer(*dispatcher, *stopEvent, *service, logger, config);
     rpcServer.start(config.serviceConfig.bindAddress, config.serviceConfig.bindPort);
 
@@ -177,5 +183,4 @@ void PaymentGateService::runWalletService(const CryptoNote::Currency& currency, 
     } catch (std::exception& ex) {
       Logging::LoggerRef(logger, "saveWallet")(Logging::WARNING, Logging::YELLOW) << "Couldn't save container: " << ex.what();
     }
-  }
 }

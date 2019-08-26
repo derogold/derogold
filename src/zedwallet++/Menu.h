@@ -11,11 +11,11 @@
 #include <Utilities/ColouredMsg.h>
 #include <zedwallet++/ParseArguments.h>
 
-std::tuple<bool, bool, std::shared_ptr<WalletBackend>> selectionScreen(const Config &config);
+std::tuple<bool, bool, std::shared_ptr<WalletBackend>> selectionScreen(const ZedConfig &config);
 
 bool checkNodeStatus(const std::shared_ptr<WalletBackend> walletBackend);
 
-std::string getAction(const Config &config);
+std::string getAction(const ZedConfig &config);
 
 void mainLoop(
     const std::shared_ptr<WalletBackend> walletBackend,
@@ -39,6 +39,11 @@ std::string parseCommand(
         if (selection == "")
         {
             continue;
+        }
+
+        if (selection == "exit")
+        {
+            return selection;
         }
 
         int selectionNum;
@@ -92,7 +97,11 @@ std::string parseCommand(
             auto it = std::find_if(availableCommands.begin(), availableCommands.end(),
             [&selection](const auto command)
             {
-                return command.commandName == selection;
+                std::string cmd = command.commandName;
+
+                std::transform(cmd.begin(), cmd.end(), cmd.begin(), ::tolower);
+
+                return cmd == selection;
             });
 
             /* Command doesn't exist in availableCommands */
