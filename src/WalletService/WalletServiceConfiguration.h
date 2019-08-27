@@ -50,7 +50,7 @@ namespace PaymentService
         int logLevel = Logging::INFO;
 
         /* Timeout for daemon connection in seconds */
-        int initTimeout = 10;
+        int initTimeout = 120;
 
         /* Should we disable RPC connection */
         bool legacySecurity = false;
