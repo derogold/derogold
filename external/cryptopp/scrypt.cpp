@@ -14,19 +14,8 @@
 #include "sha.h"
 
 #include <sstream>
-#include <limits>
-
 #ifdef _OPENMP
 # include <omp.h>
-#endif
-
-// https://github.com/weidai11/cryptopp/issues/777
-#if CRYPTOPP_GCC_DIAGNOSTIC_AVAILABLE
-# if defined(__clang__)
-#  pragma GCC diagnostic ignored "-Wtautological-compare"
-# elif defined(__GNUC__)
-#  pragma GCC diagnostic ignored "-Wtype-limits"
-# endif
 #endif
 
 ANONYMOUS_NAMESPACE_BEGIN
@@ -41,48 +30,35 @@ using CryptoPP::rotlConstant;
 using CryptoPP::LITTLE_ENDIAN_ORDER;
 using CryptoPP::AlignedSecByteBlock;
 
-inline void LE32ENC(byte* out, word32 in)
+static inline void LE32ENC(byte* out, word32 in)
 {
     PutWord(false, LITTLE_ENDIAN_ORDER, out, in);
 }
 
-inline word32 LE32DEC(const byte* in)
+static inline word32 LE32DEC(const byte* in)
 {
     return GetWord<word32>(false, LITTLE_ENDIAN_ORDER, in);
 }
 
-inline word64 LE64DEC(const byte* in)
+static inline word64 LE64DEC(const byte* in)
 {
     return GetWord<word64>(false, LITTLE_ENDIAN_ORDER, in);
 }
 
-inline void BlockCopy(byte* dest, byte* src, size_t len)
+static inline void BlockCopy(byte* dest, byte* src, size_t len)
 {
-// OpenMP 4.0 released July 2013.
-#if _OPENMP >= 201307
-    #pragma omp simd
     for (size_t i = 0; i < len; ++i)
         dest[i] = src[i];
-#else
-    for (size_t i = 0; i < len; ++i)
-        dest[i] = src[i];
-#endif
 }
 
-inline void BlockXOR(byte* dest, byte* src, size_t len)
+static inline void BlockXOR(byte* dest, byte* src, size_t len)
 {
-// OpenMP 4.0 released July 2013.
-#if _OPENMP >= 201307
     #pragma omp simd
     for (size_t i = 0; i < len; ++i)
         dest[i] ^= src[i];
-#else
-    for (size_t i = 0; i < len; ++i)
-        dest[i] ^= src[i];
-#endif
 }
 
-inline void PBKDF2_SHA256(byte* buf, size_t dkLen,
+static inline void PBKDF2_SHA256(byte* buf, size_t dkLen,
     const byte* passwd, size_t passwdlen,
     const byte* salt, size_t saltlen, byte count)
 {
@@ -93,7 +69,7 @@ inline void PBKDF2_SHA256(byte* buf, size_t dkLen,
     pbkdf.DeriveKey(buf, dkLen, 0, passwd, passwdlen, salt, saltlen, count, 0.0f);
 }
 
-inline void Salsa20_8(byte B[64])
+static inline void Salsa20_8(byte B[64])
 {
     word32 B32[16];
 
@@ -106,7 +82,7 @@ inline void Salsa20_8(byte B[64])
         LE32ENC(&B[4 * i], B32[i]);
 }
 
-inline void BlockMix(byte* B, byte* Y, size_t r)
+static inline void BlockMix(byte* B, byte* Y, size_t r)
 {
     byte X[64];
 
@@ -132,13 +108,13 @@ inline void BlockMix(byte* B, byte* Y, size_t r)
         BlockCopy(&B[(i + r) * 64], &Y[(i * 2 + 1) * 64], 64);
 }
 
-inline word64 Integerify(byte* B, size_t r)
+static inline word64 Integerify(byte* B, size_t r)
 {
     byte* X = &B[(2 * r - 1) * 64];
     return LE64DEC(X);
 }
 
-inline void Smix(byte* B, size_t r, word64 N, byte* V, byte* XY)
+static inline void Smix(byte* B, size_t r, word64 N, byte* V, byte* XY)
 {
     byte* X = XY;
     byte* Y = XY+128*r;
@@ -193,16 +169,6 @@ void Scrypt::ValidateParameters(size_t derivedLen, word64 cost, word64 blockSize
             oss << "derivedLen " << derivedLen << " is larger than " << maxLen;
             throw InvalidArgument("Scrypt: " + oss.str());
         }
-    }
-
-    // https://github.com/weidai11/cryptopp/issues/787
-    CRYPTOPP_ASSERT(parallelization <= std::numeric_limits<int>::max());
-    if (parallelization > static_cast<word64>(std::numeric_limits<int>::max()))
-    {
-        std::ostringstream oss;
-        oss << " parallelization " << parallelization << " is larger than ";
-        oss << std::numeric_limits<int>::max();
-        throw InvalidArgument("Scrypt: " + oss.str());
     }
 
     CRYPTOPP_ASSERT(IsPowerOf2(cost));
@@ -279,17 +245,8 @@ size_t Scrypt::DeriveKey(byte*derived, size_t derivedLen, const byte*secret, siz
     // 1: (B_0 ... B_{p-1}) <-- PBKDF2(P, S, 1, p * MFLen)
     PBKDF2_SHA256(B, B.size(), secret, secretLen, salt, saltLen, 1);
 
-    // Visual Studio and OpenMP 2.0 fixup. We must use int, not size_t.
-    int maxParallel=0;
-    if (!SafeConvert(parallel, maxParallel))
-        maxParallel = std::numeric_limits<int>::max();
-
-    #ifdef _OPENMP
-    int threads = STDMIN(omp_get_max_threads(), maxParallel);
-    #endif
-
     // http://stackoverflow.com/q/49604260/608639
-    #pragma omp parallel num_threads(threads)
+    #pragma omp parallel
     {
         // Each thread gets its own copy
         AlignedSecByteBlock XY(static_cast<size_t>(blockSize * 256U));
@@ -297,7 +254,7 @@ size_t Scrypt::DeriveKey(byte*derived, size_t derivedLen, const byte*secret, siz
 
         // 2: for i = 0 to p - 1 do
         #pragma omp for
-        for (int i = 0; i < maxParallel; ++i)
+        for (size_t i = 0; i < static_cast<size_t>(parallel); ++i)
         {
             // 3: B_i <-- MF(B_i, N)
             const ptrdiff_t offset = static_cast<ptrdiff_t>(blockSize*i*128);

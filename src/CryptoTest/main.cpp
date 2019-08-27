@@ -2,6 +2,8 @@
 //
 // Please see the included LICENSE file for more information.
 
+#undef NDEBUG
+
 #include <iostream>
 #include <chrono>
 #include <assert.h>
@@ -119,11 +121,12 @@ static inline bool CompareHashes(const Hash leftHash, const std::string right)
   return (leftHash == rightHash);
 }
 
-/* Hacky way to check if we're testing a v1 hash and thus should skip data
-   < 43 bytes */
+/* Check if we're testing a v1 or v2 hash function */
+/* Hacky as fuck lmao */
 bool need43BytesOfData(std::string hashFunctionName)
 {
-    return hashFunctionName.find("v1") != std::string::npos;
+    return (hashFunctionName.find("v1") != std::string::npos 
+        || hashFunctionName.find("v2") != std::string::npos);
 }
 
 /* Bit of hackery so we can get the variable name of the passed in function.
@@ -164,13 +167,7 @@ void testHashFunction(
     }
 
     /* Verify the hash is as expected */
-    if(!CompareHashes(hash, expectedOutput))
-    {
-        std::cout << "Hashes are not equal!\n" << "Expected: " << expectedOutput << "\nActual: " << hash
-                  << "\nTerminating.";
-
-        exit(1);
-    }
+    assert(CompareHashes(hash, expectedOutput));
 }
 
 /* Bit of hackery so we can get the variable name of the passed in function.

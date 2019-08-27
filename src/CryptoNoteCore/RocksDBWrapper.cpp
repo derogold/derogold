@@ -1,7 +1,19 @@
 // Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2018-2019, The TurtleCoin Developers
 //
-// Please see the included LICENSE file for more information.
+// This file is part of Bytecoin.
+//
+// Bytecoin is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Bytecoin is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with Bytecoin.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "RocksDBWrapper.h"
 
@@ -17,6 +29,7 @@ using namespace Logging;
 
 namespace {
   const std::string DB_NAME = "DB";
+  const std::string TESTNET_DB_NAME = "testnet_DB";
 }
 
 RocksDBWrapper::RocksDBWrapper(std::shared_ptr<Logging::ILogger> logger) : logger(logger, "RocksDBWrapper"), state(NOT_INITIALIZED){
@@ -163,7 +176,7 @@ rocksdb::Options RocksDBWrapper::getDBOptions(const DataBaseConfig& config) {
   dbOptions.IncreaseParallelism(config.getBackgroundThreadsCount());
   dbOptions.info_log_level = rocksdb::InfoLogLevel::WARN_LEVEL;
   dbOptions.max_open_files = config.getMaxOpenFiles();
-  
+
   rocksdb::ColumnFamilyOptions fOptions;
   fOptions.write_buffer_size = static_cast<size_t>(config.getWriteBufferSize());
   // merge two memtables when flushing to L0
@@ -189,18 +202,12 @@ rocksdb::Options RocksDBWrapper::getDBOptions(const DataBaseConfig& config) {
   fOptions.compaction_style = rocksdb::kCompactionStyleLevel;
 
   fOptions.compression_per_level.resize(fOptions.num_levels);
-
-  const auto compressionLevel = rocksdb::kZSTD ;
   for (int i = 0; i < fOptions.num_levels; ++i) {
-    // don't compress l0 & l1
-    fOptions.compression_per_level[i] = (i < 2 ? rocksdb::kNoCompression : compressionLevel);
+    fOptions.compression_per_level[i] = rocksdb::kNoCompression;
   }
-  // bottom most use lz4hc
-  fOptions.bottommost_compression = rocksdb::kZSTD ;
 
   rocksdb::BlockBasedTableOptions tableOptions;
   tableOptions.block_cache = rocksdb::NewLRUCache(config.getReadCacheSize());
-  tableOptions.block_size = 128*1024;
   std::shared_ptr<rocksdb::TableFactory> tfp(NewBlockBasedTableFactory(tableOptions));
   fOptions.table_factory = tfp;
 
@@ -208,5 +215,9 @@ rocksdb::Options RocksDBWrapper::getDBOptions(const DataBaseConfig& config) {
 }
 
 std::string RocksDBWrapper::getDataDir(const DataBaseConfig& config) {
-  return config.getDataDir() + '/' + DB_NAME;
+  if (config.getTestnet()) {
+    return config.getDataDir() + '/' + TESTNET_DB_NAME;
+  } else {
+    return config.getDataDir() + '/' + DB_NAME;
+  }
 }

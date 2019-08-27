@@ -77,9 +77,7 @@ void cleanup(
 
 int main(int argc, char **argv)
 {
-    ZedConfig config = parseArguments(argc, argv);
-
-    Logger::logger.setLogLevel(config.logLevel);
+    Config config = parseArguments(argc, argv);
 
     std::cout << InformationMsg(CryptoNote::getProjectCLIHeader()) << std::endl;
 

@@ -1,7 +1,6 @@
 // Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2014-2018, The Monero Project
 // Copyright (c) 2018-2019, The TurtleCoin Developers
-// Copyright (c) 2019, The CyprusCoin Developers
 //
 // Please see the included LICENSE file for more information.
 
@@ -62,7 +61,7 @@ void addPortMapping(Logging::LoggerRef& logger, uint32_t port) {
   // Add UPnP port mapping
   logger(INFO) << "Attempting to add IGD port mapping.";
   int result;
-  UPNPDev* deviceList = upnpDiscover(1000, NULL, NULL, 0, 0, 2, &result);
+  UPNPDev* deviceList = upnpDiscover(1000, NULL, NULL, 0, 0, &result);
   UPNPUrls urls;
   IGDdatas igdData;
   char lanAddress[64];
@@ -250,14 +249,7 @@ std::string print_peerlist_to_string(const std::list<PeerlistEntry>& pl) {
 
       try {
         std::ifstream p2p_data;
-
-        std::ios_base::openmode open_mode = std::ios_base::binary | std::ios_base::in;
-        /* --p2p-reset-peerstate daemon option 
-          Truncates the file if want the peer state reset */
-        if(m_p2p_state_reset) {
-          open_mode |= std::ios_base::trunc;
-        }
-        p2p_data.open(state_file_path, open_mode);
+        p2p_data.open(state_file_path, std::ios_base::binary | std::ios_base::in);
 
         if (!p2p_data.fail()) {
           StdInputStream inputStream(p2p_data);
@@ -380,8 +372,12 @@ std::string print_peerlist_to_string(const std::list<PeerlistEntry>& pl) {
   //-----------------------------------------------------------------------------------
 
   bool NodeServer::init(const NetNodeConfig& config) {
-    for (const auto &seed : CryptoNote::SEED_NODES) {
-      append_net_address(m_seed_nodes, seed);
+    if (!config.getTestnet()) {
+      for (auto seed : CryptoNote::SEED_NODES) {
+        append_net_address(m_seed_nodes, seed);
+      }
+    } else {
+      m_network_id.data[0] += 1;
     }
 
     if (!handleConfig(config)) {
@@ -390,7 +386,6 @@ std::string print_peerlist_to_string(const std::list<PeerlistEntry>& pl) {
     }
     m_config_folder = config.getConfigFolder();
     m_p2p_state_filename = config.getP2pStateFilename();
-    m_p2p_state_reset = config.getP2pStateReset();
 
     if (!init_config()) {
       logger(ERROR, BRIGHT_RED) << "Failed to init config.";

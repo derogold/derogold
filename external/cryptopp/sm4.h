@@ -4,11 +4,8 @@
 /// \brief Classes for the SM4 block cipher
 /// \details SM4 is a block cipher designed by Xiaoyun Wang, et al. The block cipher is part of the
 ///   Chinese State Cryptography Administration portfolio. The cipher was formely known as SMS4.
-/// \details SM4 encryption is accelerated on machines with AES-NI. Decryption is not acclerated because
-///   it is not profitable. Thanks to Markku-Juhani Olavi Saarinen for help and the code.
-/// \sa <A HREF="http://eprint.iacr.org/2008/329.pdf">SMS4 Encryption Algorithm for Wireless Networks</A>,
-///   <A HREF="http://github.com/guanzhi/GmSSL">Reference implementation using OpenSSL</A> and
-///   <A HREF="https://github.com/mjosaarinen/sm4ni">Markku-Juhani Olavi Saarinen GitHub</A>.
+/// \sa <A HREF="http://eprint.iacr.org/2008/329.pdf">SMS4 Encryption Algorithm for Wireless Networks</A> and
+///   <A HREF="http://github.com/guanzhi/GmSSL">Reference implementation using OpenSSL</A>.
 /// \since Crypto++ 6.0
 
 #ifndef CRYPTOPP_SM4_H
@@ -17,12 +14,6 @@
 #include "config.h"
 #include "seckey.h"
 #include "secblock.h"
-
-#if (CRYPTOPP_BOOL_X64 || CRYPTOPP_BOOL_X32 || CRYPTOPP_BOOL_X86)
-# ifndef CRYPTOPP_DISABLE_SM4_SIMD
-#  define CRYPTOPP_SM4_ADVANCED_PROCESS_BLOCKS 1
-# endif
-#endif
 
 NAMESPACE_BEGIN(CryptoPP)
 
@@ -51,35 +42,24 @@ public:
     {
     protected:
         void UncheckedSetKey(const byte *userKey, unsigned int keyLength, const NameValuePairs &params);
-
+    protected:
         SecBlock<word32, AllocatorWithCleanup<word32> > m_rkeys;
         mutable SecBlock<word32, AllocatorWithCleanup<word32> > m_wspace;
     };
 
-    /// \brief Encryption transformation
+    /// \brief Provides implementation for encryption transformation
     /// \details Enc provides implementation for encryption transformation. All key
     ///   sizes are supported.
-    /// \details SM4 encryption is accelerated on machines with AES-NI. Decryption is
-    ///   not acclerated because it is not profitable. Thanks to Markku-Juhani Olavi
-    ///   Saarinen.
-    /// \since Crypto++ 6.0, AESNI encryption since Crypto++ 8.0
+    /// \since Crypto++ 6.0
     class CRYPTOPP_NO_VTABLE Enc : public Base
     {
-    public:
-        std::string AlgorithmProvider() const;
     protected:
         void ProcessAndXorBlock(const byte *inBlock, const byte *xorBlock, byte *outBlock) const;
-#if CRYPTOPP_SM4_ADVANCED_PROCESS_BLOCKS
-        size_t AdvancedProcessBlocks(const byte *inBlocks, const byte *xorBlocks, byte *outBlocks, size_t length, word32 flags) const;
-#endif
     };
 
-    /// \brief Encryption transformation
+    /// \brief Provides implementation for encryption transformation
     /// \details Dec provides implementation for decryption transformation. All key
     ///   sizes are supported.
-    /// \details SM4 encryption is accelerated on machines with AES-NI. Decryption is
-    ///   not acclerated because it is not profitable. Thanks to Markku-Juhani Olavi
-    ///   Saarinen.
     /// \since Crypto++ 6.0
     class CRYPTOPP_NO_VTABLE Dec : public Base
     {

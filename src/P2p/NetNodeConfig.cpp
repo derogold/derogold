@@ -1,6 +1,5 @@
 // Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2018-2019, The TurtleCoin Developers
-// Copyright (c) 2019, The CyprusCoin Developers
 //
 // Please see the included LICENSE file for more information.
 
@@ -57,13 +56,13 @@ NetNodeConfig::NetNodeConfig() {
   allowLocalIp = false;
   hideMyPort = false;
   configFolder = Tools::getDefaultDataDirectory();
-  p2pStateReset = false;
+  testnet = false;
 }
 
 bool NetNodeConfig::init(const std::string interface, const int port, const int external, const bool localIp,
                           const bool hidePort, const std::string dataDir, const std::vector<std::string> addPeers,
                           const std::vector<std::string> addExclusiveNodes, const std::vector<std::string> addPriorityNodes,
-                          const std::vector<std::string> addSeedNodes, const bool p2pResetPeerState)
+                          const std::vector<std::string> addSeedNodes)
 {
   bindIp = interface;
   bindPort = port;
@@ -72,7 +71,6 @@ bool NetNodeConfig::init(const std::string interface, const int port, const int 
   hideMyPort = hidePort;
   configFolder = dataDir;
   p2pStateFilename = CryptoNote::parameters::P2P_NET_DATA_FILENAME;
-  p2pStateReset = p2pResetPeerState;
 
   if (!addPeers.empty())
   {
@@ -110,11 +108,15 @@ bool NetNodeConfig::init(const std::string interface, const int port, const int 
 }
 
 std::string NetNodeConfig::getP2pStateFilename() const {
+  if (testnet) {
+    return "testnet_" + p2pStateFilename;
+  }
+
   return p2pStateFilename;
 }
 
-bool NetNodeConfig::getP2pStateReset() const {
-  return p2pStateReset;
+bool NetNodeConfig::getTestnet() const {
+  return testnet;
 }
 
 std::string NetNodeConfig::getBindIp() const {

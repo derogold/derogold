@@ -1,18 +1,12 @@
-// Copyright (c) 2018-2019, The TurtleCoin Developers
-// Copyright (c) 2019, The CyprusCoin Developers
+// Copyright (c) 2018, The TurtleCoin Developers
 //
 // Please see the included LICENSE file for more information.
 
 #include "DaemonConfiguration.h"
 #include <cxxopts.hpp>
-
-#include <rapidjson/document.h>
-#include <rapidjson/istreamwrapper.h>
-#include <rapidjson/ostreamwrapper.h>
-#include "rapidjson/stringbuffer.h"
-#include <rapidjson/writer.h>
-#include <rapidjson/prettywriter.h>
+#include <json.hpp>
 #include <fstream>
+#include <sstream>
 
 #include <config/CliHeader.h>
 #include <config/CryptoNoteConfig.h>
@@ -20,10 +14,10 @@
 #include "Common/PathTools.h"
 #include "Common/Util.h"
 
-using namespace rapidjson;
+using nlohmann::json;
 
 namespace DaemonConfig{
-
+  
   DaemonConfiguration initConfiguration(const char* path)
   {
     DaemonConfiguration config;
@@ -39,10 +33,12 @@ namespace DaemonConfig{
       ("help", "Display this help message", cxxopts::value<bool>()->implicit_value("true"))
       ("os-version", "Output Operating System version information", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("resync", "Forces the daemon to delete the blockchain data and start resyncing", cxxopts::value<bool>(config.resync)->default_value("false")->implicit_value("true"))
-      ("rewind-to-height", "Rewinds the local blockchain cache to the specified height.", cxxopts::value<uint32_t>(), "#")
+      ("resync-from-height", "Rewinds the local blockchain cache to the specified height. 0 = Normal Operation",
+        cxxopts::value<uint32_t>()->default_value(std::to_string(config.rewindToHeight)), "#")
       ("version","Output daemon version information",cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
 
     options.add_options("Genesis Block")
+      ("genesis-block-reward-address", "Specify the address for any premine genesis block rewards", cxxopts::value<std::vector<std::string>>(), "<address>")
       ("print-genesis-tx", "Print the genesis block transaction hex and exits", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
 
     options.add_options("Daemon")
@@ -54,9 +50,7 @@ namespace DaemonConfig{
       ("log-file", "Specify the <path> to the log file", cxxopts::value<std::string>()->default_value(config.logFile), "<path>")
       ("log-level", "Specify log level", cxxopts::value<int>()->default_value(std::to_string(config.logLevel)), "#")
       ("no-console", "Disable daemon console commands", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
-      ("rocksdb", "Use Rocksdb for local cache files", cxxopts::value<bool>(config.useRocksdbForLocalCaches)->default_value("false")->implicit_value("true"))
-      ("save-config", "Save the configuration to the specified <file>", cxxopts::value<std::string>(), "<file>")
-      ("sqlite", "Use SQLite3 for local cache files", cxxopts::value<bool>(config.useSqliteForLocalCaches)->default_value("false")->implicit_value("true"));
+      ("save-config", "Save the configuration to the specified <file>", cxxopts::value<std::string>(), "<file>");
 
     options.add_options("RPC")
       ("enable-blockexplorer", "Enable the Blockchain Explorer RPC", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
@@ -71,7 +65,6 @@ namespace DaemonConfig{
       ("p2p-bind-ip", "Interface IP address for the P2P service", cxxopts::value<std::string>()->default_value(config.p2pInterface), "<ip>")
       ("p2p-bind-port", "TCP port for the P2P service", cxxopts::value<int>()->default_value(std::to_string(config.p2pPort)), "#")
       ("p2p-external-port", "External TCP port for the P2P service (NAT port forward)", cxxopts::value<int>()->default_value("0"), "#")
-      ("p2p-reset-peerstate", "Generate a new peer ID and remove known peers saved previously", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("rpc-bind-ip", "Interface IP address for the RPC service", cxxopts::value<std::string>()->default_value(config.rpcInterface), "<ip>")
       ("rpc-bind-port", "TCP port for the RPC service", cxxopts::value<int>()->default_value(std::to_string(config.rpcPort)), "#");
 
@@ -82,7 +75,6 @@ namespace DaemonConfig{
       ("seed-node", "Connect to a node to retrieve the peer list and then disconnect", cxxopts::value<std::vector<std::string>>(), "<ip:port>");
 
     options.add_options("Database")
-      ("db-enable-compression", "Enable database compression", cxxopts::value<bool>(config.enableDbCompression)->default_value("false")->implicit_value("true"))
       ("db-max-open-files", "Number of files that can be used by the database at one time", cxxopts::value<int>()->default_value(std::to_string(config.dbMaxOpenFiles)), "#")
       ("db-read-buffer-size", "Size of the database read cache in megabytes (MB)", cxxopts::value<int>()->default_value(std::to_string(config.dbReadCacheSizeMB)), "#")
       ("db-threads", "Number of background threads used for compaction and flush operations", cxxopts::value<int>()->default_value(std::to_string(config.dbThreads)), "#")
@@ -102,6 +94,11 @@ namespace DaemonConfig{
         config.outputFile = cli["save-config"].as<std::string>();
       }
 
+      if (cli.count("genesis-block-reward-address") > 0)
+      {
+        config.genesisAwardAddresses = cli["genesis-block-reward-address"].as<std::vector<std::string>>();
+      }
+
       if (cli.count("help") > 0)
       {
         config.help = cli["help"].as<bool>();
@@ -116,20 +113,10 @@ namespace DaemonConfig{
       {
         config.osVersion = cli["os-version"].as<bool>();
       }
-
-      if (cli.count("rewind-to-height") > 0)
+      
+      if (cli.count("resync-from-height") > 0)
       {
-        uint32_t rewindHeight = cli["rewind-to-height"].as<uint32_t>();
-        if (rewindHeight == 0)
-        {
-          std::cout << CryptoNote::getProjectCLIHeader()
-            << "Please use the `--resync` option instead of `--rewind-to-height 0` to completely reset the synchronization state." << std::endl;
-          exit(1);
-        }
-        else
-        {
-          config.rewindToHeight = rewindHeight;
-        }
+        config.rewindToHeight = cli["resync-from-height"].as<uint32_t>();
       }
 
       if (cli.count("print-genesis-tx") > 0)
@@ -160,21 +147,6 @@ namespace DaemonConfig{
       if (cli.count("log-level") > 0)
       {
         config.logLevel = cli["log-level"].as<int>();
-      }
-
-      if (cli.count("sqlite") > 0)
-      {
-        config.useSqliteForLocalCaches = cli["sqlite"].as<bool>();
-      }
-
-      if (cli.count("rocksdb") > 0)
-      {
-        config.useRocksdbForLocalCaches = cli["rocksdb"].as<bool>();
-      }
-
-      if (cli.count("db-enable-compression") > 0)
-      {
-        config.enableDbCompression = cli["db-enable-compression"].as<bool>();
       }
 
       if (cli.count("no-console") > 0)
@@ -225,11 +197,6 @@ namespace DaemonConfig{
       if (cli.count("p2p-external-port") > 0)
       {
         config.p2pExternalPort = cli["p2p-external-port"].as<int>();
-      }
-
-      if (cli.count("p2p-reset-peerstate") > 0)
-      {
-        config.p2pResetPeerstate = cli["p2p-reset-peerstate"].as<bool>();
       }
 
       if (cli.count("rpc-bind-ip") > 0)
@@ -326,7 +293,7 @@ namespace DaemonConfig{
     std::vector<std::string> peers;
     std::vector<std::string> cors;
     bool updated = false;
-
+    
     for (std::string line; std::getline(data, line);)
     {
       if (line.empty() || std::regex_match(line, item, cfgComment))
@@ -336,15 +303,15 @@ namespace DaemonConfig{
 
       if (std::regex_match(line, item, cfgItem))
       {
-        if (item.size() != 4)
+        if(item.size() != 4)
         {
           continue;
         }
-
+        
         cfgKey = item[1].str();
         cfgValue = item[2].str();
 
-        if (cfgKey.compare("data-dir") == 0)
+        if(cfgKey.compare("data-dir") == 0)
         {
           config.dataDirectory = cfgValue;
           updated = true;
@@ -364,31 +331,16 @@ namespace DaemonConfig{
           try
           {
             config.logLevel = std::stoi(cfgValue);
-            updated = true;
+            updated = true;  
           }
           catch(std::exception& e)
           {
             throw std::runtime_error(std::string(e.what()) + " - Invalid value for " + cfgKey );
           }
         }
-        else if (cfgKey.compare("sqlite") == 0)
-        {
-          config.useSqliteForLocalCaches = cfgValue.at(0) == '1';
-          updated = true;
-        }
-        else if (cfgKey.compare("rocksdb") == 0)
-        {
-          config.useRocksdbForLocalCaches = cfgValue.at(0) == '1';
-          updated = true;
-        }
-        else if (cfgKey.compare("db-enable-compression") == 0)
-        {
-          config.enableDbCompression = cfgValue.at(0) == '1';
-          updated = true;
-        }
         else if (cfgKey.compare("no-console") == 0)
         {
-          config.noConsole = cfgValue.at(0) == '1';
+          config.noConsole = cfgValue.at(0) == '1' ? true : false;
           updated = true;
         }
         else if (cfgKey.compare("db-max-open-files") == 0)
@@ -441,12 +393,12 @@ namespace DaemonConfig{
         }
         else if (cfgKey.compare("allow-local-ip") == 0)
         {
-          config.localIp =  cfgValue.at(0) == '1';
+          config.localIp =  cfgValue.at(0) == '1' ? true : false;
           updated = true;
         }
         else if (cfgKey.compare("hide-my-port") == 0)
         {
-          config.hideMyPort =  cfgValue.at(0) == '1';
+          config.hideMyPort =  cfgValue.at(0) == '1' ? true : false;
           updated = true;
         }
         else if (cfgKey.compare("p2p-bind-ip") == 0)
@@ -495,14 +447,9 @@ namespace DaemonConfig{
             throw std::runtime_error(std::string(e.what()) + " - Invalid value for " + cfgKey );
           }
         }
-        else if (cfgKey.compare("p2p-reset-peerstate") == 0)
-        {
-          config.p2pResetPeerstate =  cfgValue.at(0) == '1' ? true : false;
-          updated = true;
-        }
         else if (cfgKey.compare("add-exclusive-node") == 0)
         {
-
+          
           exclusiveNodes.push_back(cfgValue);
           config.exclusiveNodes = exclusiveNodes;
           updated = true;
@@ -527,7 +474,7 @@ namespace DaemonConfig{
         }
         else if (cfgKey.compare("enable-blockexplorer") == 0)
         {
-          config.enableBlockExplorer =  cfgValue.at(0) == '1';
+          config.enableBlockExplorer =  cfgValue.at(0) == '1' ? true : false;
           updated = true;
         }
         else if (cfgKey.compare("enable-cors") == 0)
@@ -555,9 +502,9 @@ namespace DaemonConfig{
         }
         else
         {
-          for (auto c: cfgKey)
+          for (auto c: cfgKey) 
           {
-            if (static_cast<unsigned char>(c) > 127)
+            if (static_cast<unsigned char>(c) > 127) 
             {
               throw std::runtime_error("Bad/invalid config file");
             }
@@ -567,7 +514,7 @@ namespace DaemonConfig{
       }
     }
 
-    if (!updated)
+    if(!updated)
     {
       return updated;
     }
@@ -594,269 +541,172 @@ namespace DaemonConfig{
       throw std::runtime_error("The --config-file you specified does not exist, please check the filename and try again.");
     }
 
-    IStreamWrapper isw(data);
+    json j;
+    data >> j;
 
-    Document j;
-    j.ParseStream(isw);
-
-    if (j.HasMember("data-dir"))
+    if (j.find("data-dir") != j.end())
     {
-      config.dataDirectory = j["data-dir"].GetString();
+      config.dataDirectory = j["data-dir"].get<std::string>();
     }
 
-    if (j.HasMember("load-checkpoints"))
+    if (j.find("load-checkpoints") != j.end())
     {
-      config.checkPoints = j["load-checkpoints"].GetString();
+      config.checkPoints = j["load-checkpoints"].get<std::string>();
     }
 
-    if (j.HasMember("log-file"))
+    if (j.find("log-file") != j.end())
     {
-      config.logFile = j["log-file"].GetString();
+      config.logFile = j["log-file"].get<std::string>();
     }
 
-    if (j.HasMember("log-level"))
+    if (j.find("log-level") != j.end())
     {
-      config.logLevel = j["log-level"].GetInt();
+      config.logLevel = j["log-level"].get<int>();
     }
 
-    if (j.HasMember("sqlite"))
+    if (j.find("no-console") != j.end())
     {
-      config.useSqliteForLocalCaches = j["sqlite"].GetBool();
+      config.noConsole = j["no-console"].get<bool>();
     }
 
-    if (j.HasMember("rocksdb"))
+    if (j.find("db-max-open-files") != j.end())
     {
-      config.useRocksdbForLocalCaches = j["rocksdb"].GetBool();
+      config.dbMaxOpenFiles = j["db-max-open-files"].get<int>();
     }
 
-    if (j.HasMember("db-enable-compression"))
+    if (j.find("db-read-buffer-size") != j.end())
     {
-      config.enableDbCompression = j["db-enable-compression"].GetBool();
+      config.dbReadCacheSizeMB = j["db-read-buffer-size"].get<int>();
     }
 
-    if (j.HasMember("no-console"))
+    if (j.find("db-threads") != j.end())
     {
-      config.noConsole = j["no-console"].GetBool();
+      config.dbThreads = j["db-threads"].get<int>();
     }
 
-    if (j.HasMember("db-max-open-files"))
+    if (j.find("db-write-buffer-size") != j.end())
     {
-      config.dbMaxOpenFiles = j["db-max-open-files"].GetInt();
+      config.dbWriteBufferSizeMB = j["db-write-buffer-size"].get<int>();
     }
 
-    if (j.HasMember("db-read-buffer-size"))
+    if (j.find("allow-local-ip") != j.end())
     {
-      config.dbReadCacheSizeMB = j["db-read-buffer-size"].GetInt();
+      config.localIp = j["allow-local-ip"].get<bool>();
     }
 
-    if (j.HasMember("db-threads"))
+    if (j.find("hide-my-port") != j.end())
     {
-      config.dbThreads = j["db-threads"].GetInt();
+      config.hideMyPort = j["hide-my-port"].get<bool>();
     }
 
-    if (j.HasMember("db-write-buffer-size"))
+    if (j.find("p2p-bind-ip") != j.end())
     {
-      config.dbWriteBufferSizeMB = j["db-write-buffer-size"].GetInt();
+      config.p2pInterface = j["p2p-bind-ip"].get<std::string>();
     }
 
-    if (j.HasMember("allow-local-ip"))
+    if (j.find("p2p-bind-port") != j.end())
     {
-      config.localIp = j["allow-local-ip"].GetBool();
+      config.p2pPort = j["p2p-bind-port"].get<int>();
     }
 
-    if (j.HasMember("hide-my-port"))
+    if (j.find("p2p-external-port") != j.end())
     {
-      config.hideMyPort = j["hide-my-port"].GetBool();
+      config.p2pExternalPort = j["p2p-external-port"].get<int>();
     }
 
-    if (j.HasMember("p2p-bind-ip"))
+    if (j.find("rpc-bind-ip") != j.end())
     {
-      config.p2pInterface = j["p2p-bind-ip"].GetString();
+      config.rpcInterface = j["rpc-bind-ip"].get<std::string>();
     }
 
-    if (j.HasMember("p2p-bind-port"))
+    if (j.find("rpc-bind-port") != j.end())
     {
-      config.p2pPort = j["p2p-bind-port"].GetInt();
+      config.rpcPort = j["rpc-bind-port"].get<int>();
     }
 
-    if (j.HasMember("p2p-external-port"))
+    if (j.find("add-exclusive-node") != j.end())
     {
-      config.p2pExternalPort = j["p2p-external-port"].GetInt();
+      config.exclusiveNodes = j["add-exclusive-node"].get<std::vector<std::string>>();
     }
 
-    if (j.HasMember("p2p-reset-peerstate"))
+    if (j.find("add-peer") != j.end())
     {
-      config.p2pResetPeerstate = j["p2p-reset-peerstate"].GetBool();
-    }
-    
-    if (j.HasMember("rpc-bind-ip"))
-    {
-      config.rpcInterface = j["rpc-bind-ip"].GetString();
+      config.peers = j["add-peer"].get<std::vector<std::string>>();
     }
 
-    if (j.HasMember("rpc-bind-port"))
+    if (j.find("add-priority-node") != j.end())
     {
-      config.rpcPort = j["rpc-bind-port"].GetInt();
+      config.priorityNodes = j["add-priority-node"].get<std::vector<std::string>>();
     }
 
-    if (j.HasMember("add-exclusive-node"))
+    if (j.find("seed-node") != j.end())
     {
-      const Value& va = j["add-exclusive-node"];
-      for (auto& v : va.GetArray())
-      {
-          config.exclusiveNodes.push_back(v.GetString());
-      }
+      config.seedNodes = j["seed-node"].get<std::vector<std::string>>();
     }
 
-    if (j.HasMember("add-peer"))
+    if (j.find("enable-blockexplorer") != j.end())
     {
-      const Value& va = j["add-peer"];
-      for (auto& v : va.GetArray())
-      {
-          config.peers.push_back(v.GetString());
-      }
+      config.enableBlockExplorer = j["enable-blockexplorer"].get<bool>();
     }
 
-    if (j.HasMember("add-priority-node"))
+    if (j.find("enable-cors") != j.end())
     {
-      const Value& va = j["add-priority-node"];
-      for (auto& v : va.GetArray())
-      {
-          config.priorityNodes.push_back(v.GetString());
-      }
+      config.enableCors = j["enable-cors"].get<std::vector<std::string>>();
     }
 
-    if (j.HasMember("seed-node"))
+    if (j.find("fee-address") != j.end())
     {
-      const Value& va = j["seed-node"];
-      for (auto& v : va.GetArray())
-      {
-          config.seedNodes.push_back(v.GetString());
-      }
+      config.feeAddress = j["fee-address"].get<std::string>();
     }
 
-    if (j.HasMember("enable-blockexplorer"))
+    if (j.find("fee-amount") != j.end())
     {
-      config.enableBlockExplorer = j["enable-blockexplorer"].GetBool();
-    }
-
-    if (j.HasMember("enable-cors"))
-    {
-      const Value& va = j["enable-cors"];
-      for (auto& v : va.GetArray())
-      {
-          config.enableCors.push_back(v.GetString());
-      }
-    }
-
-    if (j.HasMember("fee-address"))
-    {
-      config.feeAddress = j["fee-address"].GetString();
-    }
-
-    if (j.HasMember("fee-amount"))
-    {
-      config.feeAmount = j["fee-amount"].GetInt();
+      config.feeAmount = j["fee-amount"].get<int>();
     }
   }
 
-  Document asJSON(const DaemonConfiguration& config)
+  json asJSON(const DaemonConfiguration& config)
   {
-    Document j;
-    j.SetObject();
-    Document::AllocatorType& alloc = j.GetAllocator();
-
-    j.AddMember("data-dir", config.dataDirectory, alloc);
-    j.AddMember("load-checkpoints", config.checkPoints, alloc);
-    j.AddMember("log-file", config.logFile, alloc);
-    j.AddMember("log-level", config.logLevel, alloc);
-    j.AddMember("no-console", config.noConsole, alloc);
-    j.AddMember("rocksdb", config.useRocksdbForLocalCaches, alloc);
-    j.AddMember("sqlite", config.useSqliteForLocalCaches, alloc);
-    j.AddMember("db-enable-compression", config.enableDbCompression, alloc);
-    j.AddMember("db-max-open-files", config.dbMaxOpenFiles, alloc);
-    j.AddMember("db-read-buffer-size", (config.dbReadCacheSizeMB), alloc);
-    j.AddMember("db-threads", config.dbThreads, alloc);
-    j.AddMember("db-write-buffer-size", (config.dbWriteBufferSizeMB), alloc);
-    j.AddMember("allow-local-ip", config.localIp, alloc);
-    j.AddMember("hide-my-port", config.hideMyPort, alloc);
-    j.AddMember("p2p-bind-ip", config.p2pInterface, alloc);
-    j.AddMember("p2p-bind-port", config.p2pPort, alloc);
-    j.AddMember("p2p-external-port", config.p2pExternalPort, alloc);
-    j.AddMember("p2p-reset-peerstate", config.p2pResetPeerstate, alloc);
-    j.AddMember("rpc-bind-ip", config.rpcInterface, alloc);
-    j.AddMember("rpc-bind-port", config.rpcPort, alloc);
-
-    {
-        Value arr(rapidjson::kArrayType);
-        for (auto v : config.exclusiveNodes)
-        {
-            arr.PushBack(Value().SetString(StringRef(v.c_str())), alloc);
-        }
-        j.AddMember("add-exclusive-node", arr, alloc);
-    }
-
-    {
-        Value arr(rapidjson::kArrayType);
-        for(auto v : config.peers)
-        {
-            arr.PushBack(Value().SetString(StringRef(v.c_str())), alloc);
-        }
-        j.AddMember("add-peer", arr, alloc);
-    }
-
-    {
-        Value arr(rapidjson::kArrayType);
-        for(auto v : config.priorityNodes)
-        {
-            arr.PushBack(Value().SetString(StringRef(v.c_str())), alloc);
-        }
-        j.AddMember("add-priority-node", arr, alloc);
-    }
-
-    {
-        Value arr(rapidjson::kArrayType);
-        for(auto v : config.seedNodes)
-        {
-            arr.PushBack(Value().SetString(StringRef(v.c_str())), alloc);
-        }
-        j.AddMember("seed-node", arr, alloc);
-    }
-
-    {
-        Value arr(rapidjson::kArrayType);
-        for(auto v : config.enableCors)
-        {
-            arr.PushBack(Value().SetString(StringRef(v.c_str())), alloc);
-        }
-        j.AddMember("enable-cors", arr, alloc);
-    }
-
-    j.AddMember("enable-blockexplorer", config.enableBlockExplorer, alloc);
-    j.AddMember("fee-address", config.feeAddress, alloc);
-    j.AddMember("fee-amount", config.feeAmount, alloc);
+    json j = json {
+      {"data-dir", config.dataDirectory},
+      {"load-checkpoints", config.checkPoints},
+      {"log-file", config.logFile},
+      {"log-level", config.logLevel},
+      {"no-console", config.noConsole},
+      {"db-max-open-files", config.dbMaxOpenFiles},
+      {"db-read-buffer-size", (config.dbReadCacheSizeMB)},
+      {"db-threads", config.dbThreads},
+      {"db-write-buffer-size", (config.dbWriteBufferSizeMB)},
+      {"allow-local-ip", config.localIp},
+      {"hide-my-port", config.hideMyPort},
+      {"p2p-bind-ip", config.p2pInterface},
+      {"p2p-bind-port", config.p2pPort},
+      {"p2p-external-port", config.p2pExternalPort},
+      {"rpc-bind-ip", config.rpcInterface},
+      {"rpc-bind-port", config.rpcPort},
+      {"add-exclusive-node", config.exclusiveNodes},
+      {"add-peer", config.peers},
+      {"add-priority-node", config.priorityNodes},
+      {"seed-node", config.seedNodes},
+      {"enable-blockexplorer", config.enableBlockExplorer},
+      {"enable-cors", config.enableCors},
+      {"fee-address", config.feeAddress},
+      {"fee-amount", config.feeAmount},
+    };
 
     return j;
   }
 
   std::string asString(const DaemonConfiguration& config)
   {
-    StringBuffer strbuf;
-    PrettyWriter<StringBuffer> writer(strbuf);
-
-    Document j = asJSON(config);
-    j.Accept(writer);
-
-    return strbuf.GetString();
+    json j = asJSON(config);
+    return j.dump(2);
   }
 
   void asFile(const DaemonConfiguration& config, const std::string& filename)
   {
-    Document j = asJSON(config);
+    json j = asJSON(config);
     std::ofstream data(filename);
-    OStreamWrapper osw(data);
-
-    PrettyWriter<OStreamWrapper> writer(osw);
-    j.Accept(writer);
+    data << std::setw(2) << j << std::endl;
   }
 }

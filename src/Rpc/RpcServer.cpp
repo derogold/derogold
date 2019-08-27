@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2018-2019, The TurtleCoin Developers
+// Copyright (c) 2018, The TurtleCoin Developers
 // Copyright (c) 2018, The Karai Developers
 //
 // Please see the included LICENSE file for more information.
@@ -15,10 +15,8 @@
 #include <config/CryptoNoteConfig.h>
 
 #include <CryptoNoteCore/Core.h>
-#include <CryptoNoteCore/CryptoNoteFormatUtils.h>
-
-#include <Common/CryptoNoteTools.h>
-#include <Common/TransactionExtra.h>
+#include <CryptoNoteCore/CryptoNoteTools.h>
+#include <CryptoNoteCore/TransactionExtra.h>
 
 #include <CryptoNoteProtocol/CryptoNoteProtocolHandlerCommon.h>
 
@@ -69,11 +67,7 @@ void serialize(BlockShortInfo& blockShortInfo, ISerializer& s) {
 
 void serialize(WalletTypes::WalletBlockInfo &walletBlockInfo, ISerializer &s)
 {
-    if (walletBlockInfo.coinbaseTransaction)
-    {
-        s(*(walletBlockInfo.coinbaseTransaction), "coinbaseTX");
-    }
-
+    s(walletBlockInfo.coinbaseTransaction, "coinbaseTX");
     s(walletBlockInfo.transactions, "transactions");
     s(walletBlockInfo.blockHeight, "blockHeight");
     s(walletBlockInfo.blockHash, "blockHash");
@@ -102,12 +96,6 @@ void serialize(WalletTypes::KeyOutput &keyOutput, ISerializer &s)
 {
     s(keyOutput.key, "key");
     s(keyOutput.amount, "amount");
-}
-
-void serialize(WalletTypes::TopBlock &topBlock, ISerializer &s)
-{
-    s(topBlock.hash, "hash");
-    s(topBlock.height, "height");
 }
 
 namespace {
@@ -275,7 +263,7 @@ std::vector<std::string> RpcServer::getCorsDomains() {
 }
 
 bool RpcServer::isCoreReady() {
-  return m_p2p.get_payload_object().isSynchronized();
+  return m_core.getCurrency().isTestnet() || m_p2p.get_payload_object().isSynchronized();
 }
 
 bool RpcServer::on_get_blocks(const COMMAND_RPC_GET_BLOCKS_FAST::request& req, COMMAND_RPC_GET_BLOCKS_FAST::response& res) {
@@ -360,23 +348,12 @@ bool RpcServer::on_query_blocks_detailed(const COMMAND_RPC_QUERY_BLOCKS_DETAILED
 
 bool RpcServer::on_get_wallet_sync_data(const COMMAND_RPC_GET_WALLET_SYNC_DATA::request &req, COMMAND_RPC_GET_WALLET_SYNC_DATA::response &res)
 {
-    const bool success = m_core.getWalletSyncData(
-        req.blockIds,
-        req.startHeight,
-        req.startTimestamp,
-        req.blockCount,
-        req.skipCoinbaseTransactions,
-        res.items,
-        res.topBlock
-    );
-
-    if (!success)
+    if (!m_core.getWalletSyncData(req.blockIds, req.startHeight, req.startTimestamp, req.blockCount, res.items))
     {
         res.status = "Failed to perform query";
         return false;
     }
 
-    res.synced = res.items.empty();
     res.status = CORE_RPC_STATUS_OK;
 
     return true;
@@ -625,6 +602,7 @@ bool RpcServer::on_get_info(const COMMAND_RPC_GET_INFO::request& req, COMMAND_RP
   : CryptoNote::parameters::DIFFICULTY_TARGET));
 
   res.synced = ((uint64_t)res.height == (uint64_t)res.network_height);
+  res.testnet = m_core.getCurrency().isTestnet();
   res.major_version = m_core.getBlockDetails(m_core.getTopBlockIndex()).majorVersion;
   res.minor_version = m_core.getBlockDetails(m_core.getTopBlockIndex()).minorVersion;
   res.version = PROJECT_VERSION;
@@ -1015,7 +993,7 @@ bool RpcServer::on_getblockhash(const COMMAND_RPC_GETBLOCKHASH::request& req, CO
 
   uint32_t h = static_cast<uint32_t>(req[0]);
   Crypto::Hash blockId = m_core.getBlockHashByIndex(h - 1);
-  if (blockId == Constants::NULL_HASH) {
+  if (blockId == NULL_HASH) {
     throw JsonRpc::JsonRpcError{
       CORE_RPC_ERROR_CODE_TOO_BIG_HEIGHT,
       std::string("Too big height: ") + std::to_string(h) + ", current blockchain height = " + std::to_string(m_core.getTopBlockIndex() + 1)
@@ -1065,7 +1043,7 @@ bool RpcServer::on_getblocktemplate(const COMMAND_RPC_GETBLOCKTEMPLATE::request&
 
   BinaryArray block_blob = toBinaryArray(blockTemplate);
   PublicKey tx_pub_key = CryptoNote::getTransactionPublicKeyFromExtra(blockTemplate.baseTransaction.extra);
-  if (tx_pub_key == Constants::NULL_PUBLIC_KEY) {
+  if (tx_pub_key == NULL_PUBLIC_KEY) {
     logger(ERROR) << "Failed to find tx pub key in coinbase extra";
     throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, "Internal error: failed to find tx pub key in coinbase extra" };
   }

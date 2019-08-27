@@ -40,7 +40,7 @@ using CryptoPP::ARIATab::X2;
 using CryptoPP::ARIATab::KRK;
 
 inline byte ARIA_BRF(const word32 x, const int y) {
-	return static_cast<byte>(GETBYTE(x, y));
+	return GETBYTE(x, y);
 }
 
 // Key XOR Layer
@@ -85,11 +85,11 @@ inline byte ARIA_BRF(const word32 x, const int y) {
 
 #if (CRYPTOPP_ARM_NEON_AVAILABLE)
 extern void ARIA_UncheckedSetKey_Schedule_NEON(byte* rk, word32* ws, unsigned int keylen);
-extern void ARIA_ProcessAndXorBlock_NEON(const byte* xorBlock, byte* outblock, const byte *rk, word32 *t);
+extern void ARIA_ProcessAndXorBlock_Xor_NEON(const byte* xorBlock, byte* outblock);
 #endif
 
 #if (CRYPTOPP_SSSE3_AVAILABLE)
-extern void ARIA_ProcessAndXorBlock_SSSE3(const byte* xorBlock, byte* outBlock, const byte *rk, word32 *t);
+extern void ARIA_ProcessAndXorBlock_Xor_SSSE3(const byte* xorBlock, byte* outBlock, const byte *rk, word32 *t);
 #endif
 
 // n-bit right shift of Y XORed to X
@@ -112,6 +112,7 @@ void ARIA::Base::UncheckedSetKey(const byte *key, unsigned int keylen, const Nam
 	m_rk.New(16*17);  // round keys
 	m_w.New(4*7);     // w0, w1, w2, w3, t and u
 
+	const byte *mk = key;
 	byte *rk = m_rk.data();
 	int Q, q, R, r;
 
@@ -147,10 +148,12 @@ void ARIA::Base::UncheckedSetKey(const byte *key, unsigned int keylen, const Nam
 
 	if (keylen == 32)
 	{
+		GetBlock<word32, BigEndian, false>block(mk+16);
 		block(w1[0])(w1[1])(w1[2])(w1[3]);
 	}
 	else if (keylen == 24)
 	{
+		GetBlock<word32, BigEndian, false>block(mk+16);
 		block(w1[0])(w1[1]); w1[2] = w1[3] = 0;
 	}
 	else
@@ -282,20 +285,13 @@ void ARIA::Base::ProcessAndXorBlock(const byte *inBlock, const byte *xorBlock, b
 #if CRYPTOPP_ENABLE_ARIA_SSSE3_INTRINSICS
 	if (HasSSSE3())
 	{
-		ARIA_ProcessAndXorBlock_SSSE3(xorBlock, outBlock, rk, t);
+		ARIA_ProcessAndXorBlock_Xor_SSSE3(xorBlock, outBlock, rk, t);
 		return;
 	}
 	else
 #endif  // CRYPTOPP_ENABLE_ARIA_SSSE3_INTRINSICS
-#if (CRYPTOPP_ARM_NEON_AVAILABLE)
-	if (HasNEON())
-	{
-		ARIA_ProcessAndXorBlock_NEON(xorBlock, outBlock, rk, t);
-		return;
-	}
-	else
-#endif  // CRYPTOPP_ARM_NEON_AVAILABLE
-#if (CRYPTOPP_LITTLE_ENDIAN)
+
+#ifdef CRYPTOPP_LITTLE_ENDIAN
 	{
 		outBlock[ 0] = (byte)(X1[ARIA_BRF(t[0],3)]   ) ^ rk[ 3];
 		outBlock[ 1] = (byte)(X2[ARIA_BRF(t[0],2)]>>8) ^ rk[ 2];
@@ -335,9 +331,19 @@ void ARIA::Base::ProcessAndXorBlock(const byte *inBlock, const byte *xorBlock, b
 	}
 #endif  // CRYPTOPP_LITTLE_ENDIAN
 
-	if (xorBlock != NULLPTR)
-		for (unsigned int n=0; n<ARIA::BLOCKSIZE; ++n)
-			outBlock[n] ^= xorBlock[n];
+#if CRYPTOPP_ARM_NEON_AVAILABLE
+	if (HasNEON())
+	{
+		if (xorBlock != NULLPTR)
+			ARIA_ProcessAndXorBlock_Xor_NEON(xorBlock, outBlock);
+	}
+	else
+#endif  // CRYPTOPP_ARM_NEON_AVAILABLE
+	{
+		if (xorBlock != NULLPTR)
+			for (unsigned int n=0; n<ARIA::BLOCKSIZE; ++n)
+				outBlock[n] ^= xorBlock[n];
+	}
 }
 
 NAMESPACE_END

@@ -201,10 +201,6 @@ public:
 	/// </pre>
 	void BERDecodeAndCheck(BufferedTransformation &bt) const;
 
-	bool Empty() const {
-		return m_values.empty();
-	}
-
 	const std::vector<word32>& GetValues() const {
 		return m_values;
 	}
@@ -417,7 +413,7 @@ public:
 	virtual void DEREncodePublicKey(BufferedTransformation &bt) const =0;
 };
 
-/// \brief Encodes and Decodes privateKeyInfo
+/// \brief Encodes and decodesprivateKeyInfo
 class CRYPTOPP_DLL PKCS8PrivateKey : public ASN1CryptoMaterial<PrivateKey>
 {
 public:

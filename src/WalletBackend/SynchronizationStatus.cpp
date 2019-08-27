@@ -21,19 +21,28 @@ void SynchronizationStatus::storeBlockHash(
     const Crypto::Hash hash,
     const uint64_t height)
 {
-    m_lastKnownBlockHeight = height;
-
-    /* Already added this hash */
-    if (!m_lastKnownBlockHashes.empty() && m_lastKnownBlockHashes.back() == hash)
+    /* If it's not a fork and not the very first block */
+    if (height > m_lastKnownBlockHeight && m_lastKnownBlockHeight != 0)
     {
-        return;
+        /* Height should be one more than previous height */
+        if (height != m_lastKnownBlockHeight + 1)
+        {
+            std::stringstream stream;
+
+            stream << "Blocks were missed in syncing process! Expected: "
+                   << m_lastKnownBlockHeight + 1 << ", Received: "
+                   << height << ".\nPossibly malicious daemon. Terminating.";
+
+            throw std::runtime_error(stream.str());
+        }
     }
+
+    m_lastKnownBlockHeight = height;
 
     /* If we're at a checkpoint height, add the hash to the infrequent
        checkpoints (at the beginning of the queue) */
-    if (m_lastSavedCheckpointAt + Constants::BLOCK_HASH_CHECKPOINTS_INTERVAL < height)
+    if (height % Constants::BLOCK_HASH_CHECKPOINTS_INTERVAL == 0)
     {
-        m_lastSavedCheckpointAt = height;
         m_blockHashCheckpoints.push_front(hash);
     }
 
@@ -46,14 +55,37 @@ void SynchronizationStatus::storeBlockHash(
     }
 }
 
-std::deque<Crypto::Hash> SynchronizationStatus::getBlockCheckpoints() const
-{
-    return m_blockHashCheckpoints;
-}
+/* This returns a vector of hashes, used to be passed to queryBlocks(), to
+   determine where to begin syncing from. We could just pass in the last known
+   block hash, but if this block was on a forked chain, we would have to
+   discard all our progress, and begin again from the genesis block.
 
-std::deque<Crypto::Hash> SynchronizationStatus::getRecentBlockHashes() const
+   Instead, we store the last 100 block hashes we know about (since forks
+   are most likely going to be quite shallow forks, usually 1 or 2 blocks max),
+   and then we store one hash every 5000 blocks, in case we have a very
+   deep fork.
+   
+   Note that the first items in this vector are the latest block. On the
+   daemon side, it loops through the vector, looking for the hash in its
+   database, then returns the height it found. So, if you put your earliest
+   block at the start of the vector, you're just going to start syncing from
+   that block every time. */
+std::vector<Crypto::Hash> SynchronizationStatus::getBlockHashCheckpoints() const
 {
-    return m_lastKnownBlockHashes;
+    std::vector<Crypto::Hash> results;
+
+    /* Copy the contents of m_lastKnownBlockHashes to result, these are the
+       last 100 known block hashes we have synced. For example, if the top
+       block we know about is 110, this contains [110, 109, 108.. 10]. */
+    std::copy(m_lastKnownBlockHashes.begin(), m_lastKnownBlockHashes.end(),
+              back_inserter(results));
+
+    /* Append the contents of m_blockHashCheckpoints to result, these are the
+       checkpoints we make every 5k blocks in case of deep forks */
+    std::copy(m_blockHashCheckpoints.begin(), m_blockHashCheckpoints.end(),
+              back_inserter(results));
+
+    return results;
 }
 
 void SynchronizationStatus::fromJSON(const JSONObject &j)

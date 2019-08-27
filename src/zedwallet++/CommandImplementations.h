@@ -57,5 +57,3 @@ void advanced(const std::shared_ptr<WalletBackend> walletBackend);
 void swapNode(const std::shared_ptr<WalletBackend> walletBackend);
 
 void getTxPrivateKey(const std::shared_ptr<WalletBackend> walletBackend);
-
-void setLogLevel();

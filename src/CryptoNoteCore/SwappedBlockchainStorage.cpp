@@ -19,7 +19,7 @@
 
 #include <cassert>
 
-#include "Serialization/CryptoNoteSerialization.h"
+#include "CryptoNoteCore/CryptoNoteSerialization.h"
 #include "ICoreDefinitions.h"
 #include "MemoryBlockchainStorage.h"
 #include "Serialization/SerializationOverloads.h"

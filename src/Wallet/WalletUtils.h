@@ -19,7 +19,7 @@
 
 #include <string>
 
-#include "WalletGreenTypes.h"
+#include "IWallet.h"
 #include "CryptoNoteCore/Currency.h"
 #include "Wallet/WalletGreen.h"
 

@@ -15,4 +15,4 @@ bool handleCommand(
 
 std::shared_ptr<WalletBackend> handleLaunchCommand(
     const std::string launchCommand,
-    const ZedConfig &config);
+    const Config &config);

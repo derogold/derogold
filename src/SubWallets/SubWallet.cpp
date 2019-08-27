@@ -6,9 +6,8 @@
 #include <SubWallets/SubWallet.h>
 /////////////////////////////////
 
-#include <config/Constants.h>
-
-#include <Logger/Logger.h>
+#include <CryptoNoteCore/Account.h>
+#include <CryptoNoteCore/CryptoNoteBasicImpl.h>
 
 #include <Utilities/Utilities.h>
 
@@ -30,7 +29,7 @@ SubWallet::SubWallet(
     m_address(address),
     m_syncStartHeight(scanHeight),
     m_syncStartTimestamp(scanTimestamp),
-    m_privateSpendKey(Constants::NULL_SECRET_KEY),
+    m_privateSpendKey(Constants::BLANK_SECRET_KEY),
     m_isPrimaryAddress(isPrimaryAddress)
 {
 }
@@ -172,6 +171,35 @@ std::string SubWallet::address() const
     return m_address;
 }
 
+bool SubWallet::hasKeyImage(const Crypto::KeyImage keyImage) const
+{
+    auto it = std::find_if(m_unspentInputs.begin(), m_unspentInputs.end(),
+    [&keyImage](const auto &input)
+    {
+        return input.keyImage == keyImage;
+    });
+
+    /* Found the key image */
+    if (it != m_unspentInputs.end())
+    {
+        return true;
+    }
+
+    /* Didn't find it in unlocked inputs, check the locked inputs */
+    it = std::find_if(m_lockedInputs.begin(), m_lockedInputs.end(),
+    [&keyImage](const auto &input)
+    {
+        return input.keyImage == keyImage;
+    });
+
+    return it != m_lockedInputs.end();
+
+    /* Note: We don't need to check the spent inputs - it should never show
+       up there, as the same key image can only be used once */
+
+    /* Also don't need to check unconfirmed inputs - we can't spend those yet */
+}
+
 Crypto::PublicKey SubWallet::publicSpendKey() const
 {
     return m_publicSpendKey;
@@ -254,30 +282,16 @@ void SubWallet::markInputAsLocked(const Crypto::KeyImage keyImage)
     m_unspentInputs.erase(it);
 }
 
-std::vector<Crypto::KeyImage> SubWallet::removeForkedInputs(
-    const uint64_t forkHeight,
-    const bool isViewWallet)
+void SubWallet::removeForkedInputs(const uint64_t forkHeight)
 {
-    std::vector<Crypto::KeyImage> keyImagesToRemove;
-
-    for (const auto input : m_lockedInputs)
-    {
-        keyImagesToRemove.push_back(input.keyImage);
-    }
-
     /* Both of these will be resolved by the wallet in time */
     m_lockedInputs.clear();
     m_unconfirmedIncomingAmounts.clear();
 
     /* Unspent inputs which we recieved in a block after the fork. Remove them. */
     auto it = std::remove_if(m_unspentInputs.begin(), m_unspentInputs.end(),
-    [forkHeight, &keyImagesToRemove](const auto input)
+    [forkHeight](const auto input)
     {
-        if (input.blockHeight >= forkHeight)
-        {
-            keyImagesToRemove.push_back(input.keyImage);
-        }
-
         return input.blockHeight >= forkHeight;
     });
 
@@ -309,13 +323,6 @@ std::vector<Crypto::KeyImage> SubWallet::removeForkedInputs(
     {
         m_spentInputs.erase(it, m_spentInputs.end());
     }
-
-    if (isViewWallet)
-    {
-        return {};
-    }
-
-    return keyImagesToRemove;
 }
 
 /* Cancelled transactions are transactions we sent, but got cancelled and not
@@ -402,66 +409,6 @@ void SubWallet::convertSyncTimestampToHeight(
         m_syncStartTimestamp = timestamp;
         m_syncStartHeight = height;
     }
-}
-
-void SubWallet::pruneSpentInputs(const uint64_t pruneHeight)
-{
-    const uint64_t lenBeforePrune = m_spentInputs.size();
-
-    const auto it = std::remove_if(m_spentInputs.begin(), m_spentInputs.end(),
-    [&pruneHeight](const auto input)
-    {
-        return input.spendHeight <= pruneHeight;
-    });
-
-    if (it != m_spentInputs.end())
-    {
-        m_spentInputs.erase(it, m_spentInputs.end());
-    }
-
-    const uint64_t lenAfterPrune = m_spentInputs.size();
-
-    const uint64_t difference = lenBeforePrune - lenAfterPrune;
-
-    if (difference != 0)
-    {
-        Logger::logger.log(
-            "Pruned " + std::to_string(difference) + " spent inputs from " + m_address,
-            Logger::DEBUG,
-            {Logger::SYNC}
-        );
-    }
-}
-
-std::vector<Crypto::KeyImage> SubWallet::getKeyImages() const
-{
-    std::vector<Crypto::KeyImage> result;
-
-    const auto getKeyImages = [&result](const auto &vec)
-    {
-        std::transform(vec.begin(), vec.end(), std::back_inserter(result), [](const auto &input)
-        {
-            return input.keyImage;
-        });
-    };
-
-    getKeyImages(m_unspentInputs);
-    getKeyImages(m_lockedInputs);
-    /* You may think we don't need to include the spent key images here, since
-       we're using this method to check if an transaction was sent by us
-       by comparing the key images, and a spent key image can of course not
-       be used more than once.
-
-       However, it is possible that a spent transaction gets orphaned, returns
-       to our wallet, and is then spent again. If we did not include the spent
-       key images, when we handle the fork and mark the inputs as unspent,
-       we would not know about the key images of those inputs.
-
-       Then, when we spend it again, we would not know it's our outgoing
-       transaction. */
-    getKeyImages(m_spentInputs);
-
-    return result;
 }
 
 void SubWallet::fromJSON(const JSONValue &j)

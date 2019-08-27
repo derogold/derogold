@@ -10,8 +10,6 @@
 
 #include <unordered_map>
 
-#include <stdexcept>
-
 class SequenceEnded: public std::runtime_error {
 public:
   SequenceEnded() : std::runtime_error("shuffle sequence ended") {

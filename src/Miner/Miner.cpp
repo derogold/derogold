@@ -4,19 +4,19 @@
 //
 // Please see the included LICENSE file for more information.
 
-//////////////////
 #include "Miner.h"
-//////////////////
 
 #include <iostream>
 
-#include <Common/CheckDifficulty.h>
-#include <Common/StringTools.h>
+#include <functional>
+#include <mutex>
+#include "Common/StringTools.h"
 
-#include <crypto/crypto.h>
+#include "crypto/crypto.h"
 #include <crypto/random.h>
-
-#include <Miner/BlockUtilities.h>
+#include "CryptoNoteCore/CachedBlock.h"
+#include "CryptoNoteCore/CheckDifficulty.h"
+#include "CryptoNoteCore/CryptoNoteFormatUtils.h"
 
 #include <System/InterruptedException.h>
 
@@ -107,7 +107,8 @@ void Miner::workerFunc(const BlockTemplate& blockTemplate, uint64_t difficulty, 
 
         while (m_state == MiningState::MINING_IN_PROGRESS)
         {
-            Crypto::Hash hash = getBlockLongHash(block);
+            CachedBlock cachedBlock(block);
+            Crypto::Hash hash = cachedBlock.getBlockLongHash();
 
             if (check_hash(hash, difficulty))
             {

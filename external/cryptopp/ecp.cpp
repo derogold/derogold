@@ -12,36 +12,19 @@
 #include "filters.h"
 #include "algebra.cpp"
 
+NAMESPACE_BEGIN(CryptoPP)
+
 ANONYMOUS_NAMESPACE_BEGIN
-
-using CryptoPP::ECP;
-using CryptoPP::ModularArithmetic;
-
-#if defined(HAVE_GCC_INIT_PRIORITY)
-  const ECP::Point g_identity __attribute__ ((init_priority (CRYPTOPP_INIT_PRIORITY + 51))) = ECP::Point();
-#elif defined(HAVE_MSC_INIT_PRIORITY)
-  #pragma warning(disable: 4075)
-  #pragma init_seg(".CRT$XCU")
-  const ECP::Point g_identity;
-  #pragma warning(default: 4075)
-#elif defined(HAVE_XLC_INIT_PRIORITY)
-  #pragma priority(290)
-  const ECP::Point g_identity;
-#endif
-
-inline ECP::Point ToMontgomery(const ModularArithmetic &mr, const ECP::Point &P)
+static inline ECP::Point ToMontgomery(const ModularArithmetic &mr, const ECP::Point &P)
 {
 	return P.identity ? P : ECP::Point(mr.ConvertIn(P.x), mr.ConvertIn(P.y));
 }
 
-inline ECP::Point FromMontgomery(const ModularArithmetic &mr, const ECP::Point &P)
+static inline ECP::Point FromMontgomery(const ModularArithmetic &mr, const ECP::Point &P)
 {
 	return P.identity ? P : ECP::Point(mr.ConvertOut(P.x), mr.ConvertOut(P.y));
 }
-
-ANONYMOUS_NAMESPACE_END
-
-NAMESPACE_BEGIN(CryptoPP)
+NAMESPACE_END
 
 ECP::ECP(const ECP &ecp, bool convertToMontgomeryRepresentation)
 {
@@ -141,13 +124,13 @@ void ECP::EncodePoint(BufferedTransformation &bt, const Point &P, bool compresse
 		NullStore().TransferTo(bt, EncodedPointSize(compressed));
 	else if (compressed)
 	{
-		bt.Put((byte)(2U + P.y.GetBit(0)));
+		bt.Put(2 + P.y.GetBit(0));
 		P.x.Encode(bt, GetField().MaxElementByteLength());
 	}
 	else
 	{
 		unsigned int len = GetField().MaxElementByteLength();
-		bt.Put(4U);	// uncompressed
+		bt.Put(4);	// uncompressed
 		P.x.Encode(bt, len);
 		P.y.Encode(bt, len);
 	}
@@ -218,14 +201,7 @@ bool ECP::Equal(const Point &P, const Point &Q) const
 
 const ECP::Point& ECP::Identity() const
 {
-#if defined(HAVE_GCC_INIT_PRIORITY) || defined(HAVE_MSC_INIT_PRIORITY) || defined(HAVE_XLC_INIT_PRIORITY)
-	return g_identity;
-#elif defined(CRYPTOPP_CXX11_DYNAMIC_INIT)
-	static const ECP::Point g_identity;
-	return g_identity;
-#else
 	return Singleton<Point>().Ref();
-#endif
 }
 
 const ECP::Point& ECP::Inverse(const Point &P) const

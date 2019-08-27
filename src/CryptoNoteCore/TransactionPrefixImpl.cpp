@@ -24,7 +24,7 @@
 #include "CryptoNoteCore/CryptoNoteBasic.h"
 #include "CryptoNoteCore/TransactionApiExtra.h"
 #include "TransactionUtils.h"
-#include "Common/CryptoNoteTools.h"
+#include "CryptoNoteCore/CryptoNoteTools.h"
 
 using namespace Crypto;
 
@@ -91,7 +91,7 @@ Hash TransactionPrefixImpl::getTransactionPrefixHash() const {
 }
 
 PublicKey TransactionPrefixImpl::getTransactionPublicKey() const {
-  Crypto::PublicKey pk(Constants::NULL_PUBLIC_KEY);
+  Crypto::PublicKey pk(NULL_PUBLIC_KEY);
   m_extra.getPublicKey(pk);
   return pk;
 }

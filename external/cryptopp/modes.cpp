@@ -32,26 +32,24 @@ void CipherModeBase::ResizeBuffers()
 
 void CFB_ModePolicy::Iterate(byte *output, const byte *input, CipherDir dir, size_t iterationCount)
 {
-	CRYPTOPP_ASSERT(input);	CRYPTOPP_ASSERT(output);
-	CRYPTOPP_ASSERT(m_cipher->IsForwardTransformation());
-	CRYPTOPP_ASSERT(m_register.size() == BlockSize());
-	CRYPTOPP_ASSERT(m_temp.size() == BlockSize());
-	CRYPTOPP_ASSERT(iterationCount > 0);
+	CRYPTOPP_ASSERT(input);
+	CRYPTOPP_ASSERT(output);
+	CRYPTOPP_ASSERT(m_cipher->IsForwardTransformation());	// CFB mode needs the "encrypt" direction of the underlying block cipher, even to decrypt
+	CRYPTOPP_ASSERT(m_feedbackSize == BlockSize());
 
 	const unsigned int s = BlockSize();
 	if (dir == ENCRYPTION)
 	{
 		m_cipher->ProcessAndXorBlock(m_register, input, output);
 		if (iterationCount > 1)
-			m_cipher->AdvancedProcessBlocks(output, PtrAdd(input,s), PtrAdd(output,s), (iterationCount-1)*s, 0);
-		memcpy(m_register, PtrAdd(output,(iterationCount-1)*s), s);
+			m_cipher->AdvancedProcessBlocks(output, input+s, output+s, (iterationCount-1)*s, 0);
+		memcpy(m_register, output+(iterationCount-1)*s, s);
 	}
 	else
 	{
-		// make copy first in case of in-place decryption
-		memcpy(m_temp, PtrAdd(input,(iterationCount-1)*s), s);
+		memcpy(m_temp, input+(iterationCount-1)*s, s);	// make copy first in case of in-place decryption
 		if (iterationCount > 1)
-			m_cipher->AdvancedProcessBlocks(input, PtrAdd(input,s), PtrAdd(output,s), (iterationCount-1)*s, BlockTransformation::BT_ReverseDirection);
+			m_cipher->AdvancedProcessBlocks(input, input+s, output+s, (iterationCount-1)*s, BlockTransformation::BT_ReverseDirection);
 		m_cipher->ProcessAndXorBlock(m_register, input, output);
 		memcpy(m_register, m_temp, s);
 	}
@@ -59,21 +57,16 @@ void CFB_ModePolicy::Iterate(byte *output, const byte *input, CipherDir dir, siz
 
 void CFB_ModePolicy::TransformRegister()
 {
-	CRYPTOPP_ASSERT(m_cipher->IsForwardTransformation());
-	CRYPTOPP_ASSERT(m_register.size() == BlockSize());
-	CRYPTOPP_ASSERT(m_temp.size() == BlockSize());
-
-	const ptrdiff_t updateSize = BlockSize()-m_feedbackSize;
+	CRYPTOPP_ASSERT(m_cipher->IsForwardTransformation());	// CFB mode needs the "encrypt" direction of the underlying block cipher, even to decrypt
 	m_cipher->ProcessBlock(m_register, m_temp);
-	memmove_s(m_register, m_register.size(), PtrAdd(m_register.begin(),m_feedbackSize), updateSize);
-	memcpy_s(PtrAdd(m_register.begin(),updateSize), m_register.size()-updateSize, m_temp, m_feedbackSize);
+	unsigned int updateSize = BlockSize()-m_feedbackSize;
+	memmove_s(m_register, m_register.size(), m_register+m_feedbackSize, updateSize);
+	memcpy_s(m_register+updateSize, m_register.size()-updateSize, m_temp, m_feedbackSize);
 }
 
 void CFB_ModePolicy::CipherResynchronize(const byte *iv, size_t length)
 {
 	CRYPTOPP_ASSERT(length == BlockSize());
-	CRYPTOPP_ASSERT(m_register.size() == BlockSize());
-
 	CopyOrZero(m_register, m_register.size(), iv, length);
 	TransformRegister();
 }
@@ -91,30 +84,19 @@ void CFB_ModePolicy::ResizeBuffers()
 	m_temp.New(BlockSize());
 }
 
-byte* CFB_ModePolicy::GetRegisterBegin()
-{
-	CRYPTOPP_ASSERT(!m_register.empty());
-	CRYPTOPP_ASSERT(BlockSize() >= m_feedbackSize);
-	return PtrAdd(m_register.begin(), BlockSize() - m_feedbackSize);
-}
-
 void OFB_ModePolicy::WriteKeystream(byte *keystreamBuffer, size_t iterationCount)
 {
-	CRYPTOPP_ASSERT(m_cipher->IsForwardTransformation());
-	CRYPTOPP_ASSERT(m_register.size() == BlockSize());
-	CRYPTOPP_ASSERT(iterationCount > 0);
-
-	const unsigned int s = BlockSize();
+	CRYPTOPP_ASSERT(m_cipher->IsForwardTransformation());	// OFB mode needs the "encrypt" direction of the underlying block cipher, even to decrypt
+	unsigned int s = BlockSize();
 	m_cipher->ProcessBlock(m_register, keystreamBuffer);
 	if (iterationCount > 1)
-		m_cipher->AdvancedProcessBlocks(keystreamBuffer, NULLPTR, PtrAdd(keystreamBuffer, s), s*(iterationCount-1), 0);
-	memcpy(m_register, PtrAdd(keystreamBuffer, (iterationCount-1)*s), s);
+		m_cipher->AdvancedProcessBlocks(keystreamBuffer, NULLPTR, keystreamBuffer+s, s*(iterationCount-1), 0);
+	memcpy(m_register, keystreamBuffer+s*(iterationCount-1), s);
 }
 
 void OFB_ModePolicy::CipherResynchronize(byte *keystreamBuffer, const byte *iv, size_t length)
 {
 	CRYPTOPP_UNUSED(keystreamBuffer), CRYPTOPP_UNUSED(length);
-	CRYPTOPP_ASSERT(m_register.size() == BlockSize());
 	CRYPTOPP_ASSERT(length == BlockSize());
 
 	CopyOrZero(m_register, m_register.size(), iv, length);
@@ -125,8 +107,8 @@ void CTR_ModePolicy::SeekToIteration(lword iterationCount)
 	int carry=0;
 	for (int i=BlockSize()-1; i>=0; i--)
 	{
-		unsigned int sum = m_register[i] + (byte)iterationCount + carry;
-		m_counterArray[i] = byte(sum & 0xff);
+		unsigned int sum = m_register[i] + byte(iterationCount) + carry;
+		m_counterArray[i] = (byte) sum;
 		carry = sum >> 8;
 		iterationCount >>= 8;
 	}
@@ -139,23 +121,20 @@ void CTR_ModePolicy::IncrementCounterBy256()
 
 void CTR_ModePolicy::OperateKeystream(KeystreamOperation /*operation*/, byte *output, const byte *input, size_t iterationCount)
 {
-	CRYPTOPP_ASSERT(m_cipher->IsForwardTransformation());
-	CRYPTOPP_ASSERT(m_counterArray.size() == BlockSize());
-
-	const unsigned int s = BlockSize();
-	const unsigned int inputIncrement = input ? s : 0;
+	CRYPTOPP_ASSERT(m_cipher->IsForwardTransformation());	// CTR mode needs the "encrypt" direction of the underlying block cipher, even to decrypt
+	unsigned int s = BlockSize();
+	unsigned int inputIncrement = input ? s : 0;
 
 	while (iterationCount)
 	{
-		const byte lsb = m_counterArray[s-1];
-		const size_t blocks = UnsignedMin(iterationCount, 256U-lsb);
-
+		byte lsb = m_counterArray[s-1];
+		size_t blocks = UnsignedMin(iterationCount, 256U-lsb);
 		m_cipher->AdvancedProcessBlocks(m_counterArray, input, output, blocks*s, BlockTransformation::BT_InBlockIsCounter|BlockTransformation::BT_AllowParallel);
-		if ((m_counterArray[s-1] = byte(lsb + blocks)) == 0)
+		if ((m_counterArray[s-1] = lsb + (byte)blocks) == 0)
 			IncrementCounterBy256();
 
-		output = PtrAdd(output, blocks*s);
-		input = PtrAdd(input, blocks*inputIncrement);
+		output += blocks*s;
+		input += blocks*inputIncrement;
 		iterationCount -= blocks;
 	}
 }
@@ -163,11 +142,10 @@ void CTR_ModePolicy::OperateKeystream(KeystreamOperation /*operation*/, byte *ou
 void CTR_ModePolicy::CipherResynchronize(byte *keystreamBuffer, const byte *iv, size_t length)
 {
 	CRYPTOPP_UNUSED(keystreamBuffer), CRYPTOPP_UNUSED(length);
-	CRYPTOPP_ASSERT(m_register.size() == BlockSize());
 	CRYPTOPP_ASSERT(length == BlockSize());
 
 	CopyOrZero(m_register, m_register.size(), iv, length);
-	m_counterArray.Assign(m_register.begin(), m_register.size());
+	m_counterArray = m_register;
 }
 
 void BlockOrientedCipherModeBase::UncheckedSetKey(const byte *key, unsigned int length, const NameValuePairs &params)
@@ -196,23 +174,20 @@ void ECB_OneWay::ProcessData(byte *outString, const byte *inString, size_t lengt
 
 void CBC_Encryption::ProcessData(byte *outString, const byte *inString, size_t length)
 {
-	CRYPTOPP_ASSERT(length%BlockSize()==0);
-	CRYPTOPP_ASSERT(m_register.size() == BlockSize());
 	if (!length) return;
+	CRYPTOPP_ASSERT(length%BlockSize()==0);
 
 	const unsigned int blockSize = BlockSize();
 	m_cipher->AdvancedProcessBlocks(inString, m_register, outString, blockSize, BlockTransformation::BT_XorInput);
 	if (length > blockSize)
-		m_cipher->AdvancedProcessBlocks(PtrAdd(inString,blockSize), outString, PtrAdd(outString,blockSize), length-blockSize, BlockTransformation::BT_XorInput);
-	memcpy(m_register, PtrAdd(outString, length - blockSize), blockSize);
+		m_cipher->AdvancedProcessBlocks(inString+blockSize, outString, outString+blockSize, length-blockSize, BlockTransformation::BT_XorInput);
+	memcpy(m_register, outString + length - blockSize, blockSize);
 }
 
 size_t CBC_CTS_Encryption::ProcessLastBlock(byte *outString, size_t outLength, const byte *inString, size_t inLength)
 {
 	CRYPTOPP_UNUSED(outLength);
-	const size_t used = inLength;
-	const unsigned int blockSize = BlockSize();
-
+	size_t used = inLength;
 	if (inLength <= BlockSize())
 	{
 		if (!m_stolenIV)
@@ -225,17 +200,17 @@ size_t CBC_CTS_Encryption::ProcessLastBlock(byte *outString, size_t outLength, c
 	else
 	{
 		// steal from next to last block
-		xorbuf(m_register, inString, blockSize);
+		xorbuf(m_register, inString, BlockSize());
 		m_cipher->ProcessBlock(m_register);
-		inString = PtrAdd(inString, blockSize);
-		inLength -= blockSize;
-		memcpy(PtrAdd(outString, blockSize), m_register, inLength);
+		inString += BlockSize();
+		inLength -= BlockSize();
+		memcpy(outString+BlockSize(), m_register, inLength);
 	}
 
 	// output last full ciphertext block
 	xorbuf(m_register, inString, inLength);
 	m_cipher->ProcessBlock(m_register);
-	memcpy(outString, m_register, blockSize);
+	memcpy(outString, m_register, BlockSize());
 
 	return used;
 }
@@ -248,14 +223,14 @@ void CBC_Decryption::ResizeBuffers()
 
 void CBC_Decryption::ProcessData(byte *outString, const byte *inString, size_t length)
 {
+	if (!length)
+		return;
 	CRYPTOPP_ASSERT(length%BlockSize()==0);
-	if (!length) {return;}
 
-	// save copy now in case of in-place decryption
 	const unsigned int blockSize = BlockSize();
-	memcpy(m_temp, PtrAdd(inString,length-blockSize), blockSize);
+	memcpy(m_temp, inString+length-blockSize, blockSize);	// save copy now in case of in-place decryption
 	if (length > blockSize)
-		m_cipher->AdvancedProcessBlocks(PtrAdd(inString,blockSize), inString, PtrAdd(outString,blockSize), length-blockSize, BlockTransformation::BT_ReverseDirection|BlockTransformation::BT_AllowParallel);
+		m_cipher->AdvancedProcessBlocks(inString+blockSize, inString, outString+blockSize, length-blockSize, BlockTransformation::BT_ReverseDirection|BlockTransformation::BT_AllowParallel);
 	m_cipher->ProcessAndXorBlock(inString, m_register, outString);
 	m_register.swap(m_temp);
 }
@@ -264,9 +239,8 @@ size_t CBC_CTS_Decryption::ProcessLastBlock(byte *outString, size_t outLength, c
 {
 	CRYPTOPP_UNUSED(outLength);
 	const byte *pn1, *pn2;
-	const size_t used = inLength;
-	const bool stealIV = inLength <= BlockSize();
-	const unsigned int blockSize = BlockSize();
+	bool stealIV = inLength <= BlockSize();
+	size_t used = inLength;
 
 	if (stealIV)
 	{
@@ -275,13 +249,13 @@ size_t CBC_CTS_Decryption::ProcessLastBlock(byte *outString, size_t outLength, c
 	}
 	else
 	{
-		pn1 = PtrAdd(inString, blockSize);
+		pn1 = inString + BlockSize();
 		pn2 = inString;
-		inLength -= blockSize;
+		inLength -= BlockSize();
 	}
 
 	// decrypt last partial plaintext block
-	memcpy(m_temp, pn2, blockSize);
+	memcpy(m_temp, pn2, BlockSize());
 	m_cipher->ProcessBlock(m_temp);
 	xorbuf(m_temp, pn1, inLength);
 
@@ -291,11 +265,11 @@ size_t CBC_CTS_Decryption::ProcessLastBlock(byte *outString, size_t outLength, c
 	}
 	else
 	{
-		memcpy(PtrAdd(outString, blockSize), m_temp, inLength);
+		memcpy(outString+BlockSize(), m_temp, inLength);
 		// decrypt next to last plaintext block
 		memcpy(m_temp, pn1, inLength);
 		m_cipher->ProcessBlock(m_temp);
-		xorbuf(outString, m_temp, m_register, blockSize);
+		xorbuf(outString, m_temp, m_register, BlockSize());
 	}
 
 	return used;

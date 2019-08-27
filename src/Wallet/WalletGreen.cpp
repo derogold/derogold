@@ -6,70 +6,45 @@
 //
 // Please see the included LICENSE file for more information.
 
-///////////////////////////////
-#include <Wallet/WalletGreen.h>
-///////////////////////////////
+#include "WalletGreen.h"
 
 #include <algorithm>
-
-#include <cassert>
-
-#include <Common/CryptoNoteTools.h>
-#include <Common/ScopeExit.h>
-#include <Common/ShuffleGenerator.h>
-#include <Common/StdInputStream.h>
-#include <Common/StdOutputStream.h>
-#include <Common/StreamTools.h>
-#include <Common/StringOutputStream.h>
-#include <Common/StringTools.h>
-
-#include <crypto/crypto.h>
-#include <crypto/random.h>
-
-#include <CryptoNoteCore/Account.h>
-#include <CryptoNoteCore/Core.h>
-#include <CryptoNoteCore/Currency.h>
-#include <CryptoNoteCore/CryptoNoteBasicImpl.h>
-#include <CryptoNoteCore/CryptoNoteFormatUtils.h>
-#include <CryptoNoteCore/TransactionApi.h>
-
 #include <ctime>
-
+#include <cassert>
 #include <fstream>
-
-#include "ITransaction.h"
-
 #include <numeric>
-
 #include <random>
-
-#include <Serialization/CryptoNoteSerialization.h>
-
 #include <set>
+#include <tuple>
+#include <utility>
 
 #include <System/EventLock.h>
 #include <System/RemoteContext.h>
 
-#include <Transfers/TransfersContainer.h>
+#include "ITransaction.h"
 
-#include <tuple>
+#include "Common/ScopeExit.h"
+#include "Common/ShuffleGenerator.h"
+#include "Common/StdInputStream.h"
+#include "Common/StdOutputStream.h"
+#include "Common/StreamTools.h"
+#include "Common/StringOutputStream.h"
+#include "Common/StringTools.h"
+#include "CryptoNoteCore/Account.h"
+#include "CryptoNoteCore/Currency.h"
+#include "CryptoNoteCore/CryptoNoteBasicImpl.h"
+#include "CryptoNoteCore/CryptoNoteFormatUtils.h"
+#include "CryptoNoteCore/CryptoNoteSerialization.h"
+#include "CryptoNoteCore/CryptoNoteTools.h"
+#include "CryptoNoteCore/TransactionApi.h"
+#include "crypto/crypto.h"
+#include <crypto/random.h>
+#include "Transfers/TransfersContainer.h"
+#include "WalletSerializationV2.h"
+#include "WalletErrors.h"
+#include "WalletUtils.h"
 
-#include <utility>
-
-#include <Utilities/Addresses.h>
-#include <Utilities/ParseExtra.h>
 #include <Utilities/Utilities.h>
-
-#include <Wallet/WalletSerializationV2.h>
-#include <Wallet/WalletErrors.h>
-#include <Wallet/WalletUtils.h>
-
-#include <Utilities/Utilities.h>
-
-#include <WalletBackend/Constants.h>
-#include <WalletBackend/WalletBackend.h>
-
-#undef ERROR
 
 using namespace Common;
 using namespace Crypto;
@@ -185,7 +160,7 @@ void WalletGreen::createViewWallet(const std::string &path,
     CryptoNote::AccountPublicAddress publicKeys;
     uint64_t prefix;
 
-    if (!Utilities::parseAccountAddressString(prefix, publicKeys, address))
+    if (!CryptoNote::parseAccountAddressString(prefix, publicKeys, address))
     {
         throw std::runtime_error("Failed to parse address!");
     }
@@ -777,12 +752,12 @@ void WalletGreen::loadSpendKeys() {
     wallet.creationTimestamp = creationTimestamp;
 
     if (i == 0) {
-      isTrackingMode = wallet.spendSecretKey == Constants::NULL_SECRET_KEY;
-    } else if ((isTrackingMode && wallet.spendSecretKey != Constants::NULL_SECRET_KEY) || (!isTrackingMode && wallet.spendSecretKey == Constants::NULL_SECRET_KEY)) {
+      isTrackingMode = wallet.spendSecretKey == NULL_SECRET_KEY;
+    } else if ((isTrackingMode && wallet.spendSecretKey != NULL_SECRET_KEY) || (!isTrackingMode && wallet.spendSecretKey == NULL_SECRET_KEY)) {
       throw std::system_error(make_error_code(error::BAD_ADDRESS), "All addresses must be whether tracking or not");
     }
 
-    if (wallet.spendSecretKey != Constants::NULL_SECRET_KEY) {
+    if (wallet.spendSecretKey != NULL_SECRET_KEY) {
       throwIfKeysMismatch(wallet.spendSecretKey, wallet.spendPublicKey, "Restored spend public key doesn't correspond to secret key");
     } else {
       if (!Crypto::check_key(wallet.spendPublicKey)) {
@@ -960,7 +935,7 @@ std::string WalletGreen::createAddress(const Crypto::PublicKey& spendPublicKey, 
         throw std::system_error(make_error_code(error::WRONG_PARAMETERS), "Wrong public key format");
     }
 
-    return doCreateAddress(spendPublicKey, Constants::NULL_SECRET_KEY, scanHeight, newAddress);
+    return doCreateAddress(spendPublicKey, NULL_SECRET_KEY, scanHeight, newAddress);
 }
 
 std::vector<std::string> WalletGreen::createAddressList(const std::vector<Crypto::SecretKey>& spendSecretKeys, const uint64_t scanHeight, const bool newAddress)
@@ -1085,10 +1060,10 @@ std::string WalletGreen::addWallet(const NewAddressData &addressData, uint64_t s
 
   auto trackingMode = getTrackingMode();
 
-  if ((trackingMode == WalletTrackingMode::TRACKING && spendSecretKey != Constants::NULL_SECRET_KEY) ||
-      (trackingMode == WalletTrackingMode::NOT_TRACKING && spendSecretKey == Constants::NULL_SECRET_KEY)) {
+  if ((trackingMode == WalletTrackingMode::TRACKING && spendSecretKey != NULL_SECRET_KEY) ||
+      (trackingMode == WalletTrackingMode::NOT_TRACKING && spendSecretKey == NULL_SECRET_KEY)) {
     m_logger(ERROR, BRIGHT_RED) << "Failed to add wallet: incompatible tracking mode and spend secret key, tracking mode=" << trackingMode <<
-      ", spendSecretKey " << (spendSecretKey == Constants::NULL_SECRET_KEY ? "is null" : "is not null");
+      ", spendSecretKey " << (spendSecretKey == NULL_SECRET_KEY ? "is null" : "is not null");
     throw std::system_error(make_error_code(error::WRONG_PARAMETERS));
   }
 
@@ -1187,9 +1162,7 @@ uint64_t WalletGreen::getCurrentTimestampAdjusted()
     /* Take the amount of time a block can potentially be in the past/future */
     std::initializer_list<uint64_t> limits =
     {
-        CryptoNote::parameters::CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT,
-        CryptoNote::parameters::CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT_V3,
-        CryptoNote::parameters::CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT_V4
+        CryptoNote::parameters::CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT
     };
 
     /* Get the largest adjustment possible */
@@ -2827,7 +2800,7 @@ void WalletGreen::transactionUpdated(const TransactionInformation& transactionIn
     ", block " << transactionInfo.blockHeight <<
     ", totalAmountIn " << m_currency.formatAmount(transactionInfo.totalAmountIn) <<
     ", totalAmountOut " << m_currency.formatAmount(transactionInfo.totalAmountOut) <<
-    (transactionInfo.paymentId == Constants::NULL_HASH ? "" : ", paymentId " + podToHex(transactionInfo.paymentId));
+    (transactionInfo.paymentId == NULL_HASH ? "" : ", paymentId " + podToHex(transactionInfo.paymentId));
 
   if (m_state == WalletState::NOT_INITIALIZED) {
     return;
@@ -3117,7 +3090,7 @@ WalletGreen::WalletTrackingMode WalletGreen::getTrackingMode() const {
     return WalletTrackingMode::NO_ADDRESSES;
   }
 
-  return m_walletsContainer.get<RandomAccessIndex>().begin()->spendSecretKey == Constants::NULL_SECRET_KEY ?
+  return m_walletsContainer.get<RandomAccessIndex>().begin()->spendSecretKey == NULL_SECRET_KEY ?
         WalletTrackingMode::TRACKING : WalletTrackingMode::NOT_TRACKING;
 }
 
@@ -3167,7 +3140,7 @@ size_t WalletGreen::createFusionTransaction(uint64_t threshold, uint16_t mixin,
     throw std::runtime_error("You must have at least one address");
   }
 
-  size_t estimatedFusionInputsCount = Utilities::getApproximateMaximumInputCount(m_currency.fusionTxMaxSize(), MAX_FUSION_OUTPUT_COUNT, mixin);
+  size_t estimatedFusionInputsCount = m_currency.getApproximateMaximumInputCount(m_currency.fusionTxMaxSize(), MAX_FUSION_OUTPUT_COUNT, mixin);
   if (estimatedFusionInputsCount < m_currency.fusionTxMinInputCount()) {
     m_logger(ERROR, BRIGHT_RED) << "Fusion transaction mixin is too big " << mixin;
     throw std::system_error(make_error_code(error::MIXIN_COUNT_TOO_BIG));
@@ -3662,404 +3635,6 @@ size_t WalletGreen::getMaxTxSize()
 
     return std::min(x, y) - CryptoNote::parameters
                                       ::CRYPTONOTE_COINBASE_BLOB_RESERVED_SIZE;
-}
-
-uint64_t WalletGreen::getMinTimestamp() const
-{
-    uint64_t minTimestamp = std::numeric_limits<uint64_t>::max();
-
-    if (m_containerStorage.size() == 0)
-    {
-        return 0;
-    }
-
-    auto &walletsIndex = m_walletsContainer.get<RandomAccessIndex>();
-
-    for (const auto subWallet : walletsIndex)
-    {
-        if (static_cast<uint64_t>(subWallet.creationTimestamp) < minTimestamp)
-        {
-            minTimestamp = subWallet.creationTimestamp;
-        }
-    }
-
-    return minTimestamp;
-}
-
-std::vector<Crypto::PublicKey> WalletGreen::getPublicSpendKeys() const
-{
-    std::vector<Crypto::PublicKey> result;
-
-    auto &walletsIndex = m_walletsContainer.get<RandomAccessIndex>();
-
-    for (const auto subWallet : walletsIndex)
-    {
-        result.push_back(subWallet.spendPublicKey);
-    }
-
-    return result;
-}
-
-std::string WalletGreen::getPrimaryAddress() const
-{
-    bool defaultPicked = false;
-
-    std::string defaultPrimaryAddress;
-
-    auto &walletsIndex = m_walletsContainer.get<RandomAccessIndex>();
-
-    for (const auto subWallet : walletsIndex)
-    {
-        Crypto::SecretKey derivedPrivateViewKey;
-
-        /* Derive the view key from the spend key, and check if it matches the
-           actual view key */
-        Crypto::crypto_ops::generateViewFromSpend(
-            subWallet.spendSecretKey,
-            derivedPrivateViewKey
-        );
-
-        /* If this subwallet is a deterministic one, use this as the primary address */
-        if (derivedPrivateViewKey == m_viewSecretKey)
-        {
-            return m_currency.accountAddressAsString({ subWallet.spendPublicKey, m_viewPublicKey });
-        }
-
-        if (!defaultPicked)
-        {
-            defaultPrimaryAddress = m_currency.accountAddressAsString({ subWallet.spendPublicKey, m_viewPublicKey });
-            defaultPicked = true;
-        }
-    }
-
-    if (m_containerStorage.size() == 0)
-    {
-        return std::string();
-    }
-
-    /* If we didn't find a determinstic wallet, just use the first address */
-    return defaultPrimaryAddress;
-}
-
-Crypto::KeyImage WalletGreen::getKeyImage(
-    const Crypto::PublicKey transactionPublicKey,
-    const uint64_t outputIndex,
-    const Crypto::PublicKey key,
-    const Crypto::SecretKey privateSpendKey,
-    const Crypto::PublicKey publicSpendKey) const
-{
-    Crypto::KeyDerivation derivation;
-
-    Crypto::generate_key_derivation(transactionPublicKey, m_viewSecretKey, derivation);
-
-    Crypto::PublicKey derivedSpendKey;
-
-    Crypto::underive_public_key(derivation, outputIndex, key, derivedSpendKey);
-
-    Crypto::KeyImage keyImage;
-
-    /* Make a temporary key pair */
-    CryptoNote::KeyPair tmp;
-
-    /* Get the tmp public key from the derivation, the index,
-       and our public spend key */
-    Crypto::derive_public_key(
-        derivation, outputIndex, publicSpendKey, tmp.publicKey
-    );
-
-    /* Get the tmp private key from the derivation, the index,
-       and our private spend key */
-    Crypto::derive_secret_key(
-        derivation, outputIndex, privateSpendKey, tmp.secretKey
-    );
-
-    /* Get the key image from the tmp public and private key */
-    Crypto::generate_key_image(
-        tmp.publicKey, tmp.secretKey, keyImage
-    );
-
-    return keyImage;
-}
-
-std::vector<std::tuple<WalletTypes::TransactionInput, Crypto::Hash>> WalletGreen::getInputs(
-    const WalletRecord subWallet,
-    const bool isViewWallet,
-    const bool unspent) const
-{
-    const uint64_t height = getBlockCount();
-
-    std::vector<std::tuple<WalletTypes::TransactionInput, Crypto::Hash>> result;
-
-    std::vector<SpentTransactionOutput> inputs;
-
-    if (unspent)
-    {
-        inputs = subWallet.container->getUnspentInputs();
-    }
-    else
-    {
-        inputs = subWallet.container->getSpentInputs();
-    }
-
-    for (const auto &input : inputs)
-    {
-        const auto tx = getTransaction(input.transactionHash);
-
-        /* Input is spent and is old enough to not need storing */
-        const bool oldSpentInput = !unspent &&
-                                   tx.transaction.blockHeight + Constants::PRUNE_SPENT_INPUTS_INTERVAL < height;
-
-        WalletTypes::TransactionInput newInput;
-        
-        /* Don't generate key image for inputs that will be discarded by
-           WalletBackend */
-        if (!isViewWallet && !oldSpentInput)
-        {
-            newInput.keyImage = getKeyImage(
-                input.transactionPublicKey,
-                input.outputInTransaction,
-                input.outputKey,
-                subWallet.spendSecretKey,
-                subWallet.spendPublicKey
-            );
-        }
-
-        newInput.amount = input.amount;
-        newInput.blockHeight = tx.transaction.blockHeight;
-        newInput.transactionPublicKey = input.transactionPublicKey;
-        newInput.transactionIndex = input.outputInTransaction;
-        newInput.globalOutputIndex = input.globalOutputIndex;
-        newInput.key = input.outputKey;
-        newInput.spendHeight = unspent ? 0 : input.spendingBlock.height;
-        newInput.unlockTime = input.unlockTime;
-        newInput.parentTransactionHash = input.transactionHash;
-
-        result.push_back({newInput, input.spendingTransactionHash});
-    }
-
-    return result;
-}
-
-std::string WalletGreen::toNewFormatJSON() const
-{
-    rapidjson::StringBuffer sb;
-    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
-
-    const bool isViewWallet = getTrackingMode() == WalletTrackingMode::TRACKING;
-
-    std::unordered_map<Crypto::Hash, std::vector<std::tuple<int64_t, Crypto::PublicKey>>> transfers;
-
-    writer.StartObject();
-    {
-        /* File format */
-        writer.Key("walletFileFormatVersion");
-        writer.Uint(Constants::WALLET_FILE_FORMAT_VERSION);
-
-        /* Subwallets */
-        writer.Key("subWallets");
-        writer.StartObject();
-        {
-            /* The public spend keys of all the subwallets */
-            writer.Key("publicSpendKeys");
-            writer.StartArray();
-            {
-                for (const auto key : getPublicSpendKeys())
-                {
-                    key.toJSON(writer);
-                }
-            }
-            writer.EndArray();
-
-            /* Each subwallet */
-            writer.Key("subWallet");
-            writer.StartArray();
-            {
-                const std::string primaryAddress = getPrimaryAddress();
-
-                auto &walletsIndex = m_walletsContainer.get<RandomAccessIndex>();
-
-                for (const auto subWallet : walletsIndex)
-                {
-                    const std::string address = m_currency.accountAddressAsString({ subWallet.spendPublicKey, m_viewPublicKey });
-
-                    writer.StartObject();
-                    {
-                        /* Subwallet public spend key */
-                        writer.Key("publicSpendKey");
-                        subWallet.spendPublicKey.toJSON(writer);
-
-                        /* Subwallet private spend key */
-                        writer.Key("privateSpendKey");
-                        subWallet.spendSecretKey.toJSON(writer);
-
-                        /* Subwallet address, comprised of public spend key and shared public view key */
-                        writer.Key("address");
-                        writer.String(address);
-
-                        /* Timestamp to begin syncing at */
-                        writer.Key("syncStartTimestamp");
-                        writer.Uint64(0);
-
-                        /* Inputs that have been received and not spent */
-                        writer.Key("unspentInputs");
-                        writer.StartArray();
-                        {
-                            for (const auto &[input, spendingTransactionHash] : getInputs(subWallet, isViewWallet, true))
-                            {
-                                transfers[input.parentTransactionHash].push_back({input.amount, subWallet.spendPublicKey});
-                                input.toJSON(writer);
-                            }
-                        }
-                        writer.EndArray();
-
-                        /* Inputs that have been sent but not confirmed in a block */
-                        /* We could probably fill this in, but it's simpler to
-                           not do so - it will be resolved auomatically as the
-                           transactions get confirmed, and it's likely we treat
-                           locked inputs differently between the two formats. */
-                        writer.Key("lockedInputs");
-                        writer.StartArray();
-                        {
-                        }
-                        writer.EndArray();
-
-                        /* Input that have been spent */
-                        writer.Key("spentInputs");
-                        writer.StartArray();
-                        {
-                            for (const auto &[input, spendingTransactionHash] : getInputs(subWallet, isViewWallet, false))
-                            {
-                                transfers[input.parentTransactionHash].push_back({input.amount, subWallet.spendPublicKey});
-                                transfers[spendingTransactionHash].push_back({-input.amount, subWallet.spendPublicKey});
-                                input.toJSON(writer);
-                            }
-                        }
-                        writer.EndArray();
-
-                        /* Height to begin syncing at - Always stored as timestamp
-                           in WalletGreen so static at 0 */
-                        writer.Key("syncStartHeight");
-                        writer.Uint64(0); // TODO timestamp to height
-
-                        writer.Key("isPrimaryAddress");
-                        writer.Bool(address == primaryAddress);
-
-                        writer.Key("unconfirmedIncomingAmounts");
-                        writer.StartArray();
-                        {
-                        }
-                        writer.EndArray();
-                    }
-                    writer.EndObject();
-                }
-            }
-            writer.EndArray();
-
-            /* Transactions in a block */
-            writer.Key("transactions");
-            writer.StartArray();
-            {
-                const size_t numTransactions = getTransactionCount();
-
-                for (size_t i = 0; i < numTransactions; i++)
-                {
-                    const auto tx = getTransaction(i);
-
-                    WalletTypes::Transaction newTX;
-
-                    for (const auto [amount, publicSpendKey] : transfers[tx.hash])
-                    {
-                        newTX.transfers[publicSpendKey] += amount;
-                    }
-
-                    newTX.hash = tx.hash;
-                    newTX.fee = tx.fee;
-                    newTX.blockHeight = tx.blockHeight;
-                    newTX.timestamp = tx.timestamp;
-                    newTX.paymentID = Utilities::getPaymentIDFromExtra(Common::asBinaryArray(tx.extra));
-                    newTX.unlockTime = tx.unlockTime;
-                    newTX.isCoinbaseTransaction = tx.isBase;
-
-                    newTX.toJSON(writer);
-                }
-            }
-            writer.EndArray();
-
-            /* Outgoing transactions not in a block yet */
-            /* Not going to fill in, as with locked inputs */
-            writer.Key("lockedTransactions");
-            writer.StartArray();
-            {
-            }
-            writer.EndArray();
-
-            /* The shared private view key */
-            writer.Key("privateViewKey");
-            m_viewSecretKey.toJSON(writer);
-
-            /* Whether this is a view only wallet */
-            writer.Key("isViewWallet");
-            writer.Bool(isViewWallet);
-
-            /* Private keys of each transaction. Not stored in walletgreen. */
-            writer.Key("txPrivateKeys");
-            writer.StartArray();
-            {
-            }
-            writer.EndArray();
-        }
-        writer.EndObject();
-
-        /* Sync status */
-        writer.Key("walletSynchronizer");
-        writer.StartObject();
-        {
-            /* Sync history */
-            writer.Key("transactionSynchronizerStatus");
-            writer.StartObject();
-            {
-                /* Lets not bother with this - it's all handed by lastKnownBlockHashes */
-                writer.Key("blockHashCheckpoints");
-                writer.StartArray();
-                {
-                }
-                writer.EndArray();
-
-                /* Hashes for sync history */
-                writer.Key("lastKnownBlockHashes");
-                writer.StartArray();
-                {
-                    for (const auto hash : m_blockchainSynchronizer.getLastKnownBlockHashes())
-                    {
-                        hash.toJSON(writer);
-                    }
-                }
-                writer.EndArray();
-
-                /* We could get the height of the largest hash above... but it
-                   doesn't really matter */
-                writer.Key("lastKnownBlockHeight");
-                writer.Uint64(0);
-            }
-            writer.EndObject();
-
-            /* Timestamp to start syncing from */
-            writer.Key("startTimestamp");
-            writer.Uint64(0);
-
-            writer.Key("startHeight");
-            writer.Uint64(0); // TODO timestamp to height
-
-            /* The private view key */
-            writer.Key("privateViewKey");
-            m_viewSecretKey.toJSON(writer);
-
-        }
-        writer.EndObject();
-    }
-    writer.EndObject();
-
-    return sb.GetString();
 }
 
 } //namespace CryptoNote

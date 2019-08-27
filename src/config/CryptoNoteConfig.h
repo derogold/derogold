@@ -2,7 +2,6 @@
 // Copyright (c) 2014-2018, The Monero Project
 // Copyright (c) 2018-2019, The TurtleCoin Developers
 // Copyright (c) 2018-2019, The DeroGold Association
-// Copyright (c) 2018-2019, The WrkzCoin developers
 //
 // Please see the included LICENSE file for more information.
 
@@ -14,12 +13,11 @@
 #include <limits>
 #include <initializer_list>
 #include <boost/uuid/uuid.hpp>
-#include <crypto/hash.h>
 
 namespace CryptoNote {
 namespace parameters {
 
-const uint64_t DIFFICULTY_TARGET                             = 10; //
+const uint64_t DIFFICULTY_TARGET                             = 10; // seconds
 const uint64_t DIFFICULTY_TARGET_V2                          = 20; // seconds
 
 /* Height to swap to DIFFICULTY_TARGET_V2 */
@@ -29,30 +27,22 @@ const uint32_t CRYPTONOTE_MAX_BLOCK_NUMBER                   = 500000000;
 const size_t   CRYPTONOTE_MAX_BLOCK_BLOB_SIZE                = 500000000;
 const size_t   CRYPTONOTE_MAX_TX_SIZE                        = 1000000000;
 const uint64_t CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX       = 8411;
-const uint32_t CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW          = 120; //
+const uint32_t CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW          = 120;
 const uint64_t CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT            = 6 * DIFFICULTY_TARGET;
-const uint64_t CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT_V3         = 6 * DIFFICULTY_TARGET;
-const uint64_t CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT_V4         = 6 * DIFFICULTY_TARGET;
 
 const size_t   BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW             = 11;
-const size_t   BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW_V3          = 11;
 
 // MONEY_SUPPLY - total number coins to be generated
 const uint64_t MONEY_SUPPLY                                  = UINT64_C(10000000000000000);
-const uint32_t ZAWY_DIFFICULTY_BLOCK_INDEX                   = 0;
-const size_t   ZAWY_DIFFICULTY_V2                            = 0;
-const uint8_t  ZAWY_DIFFICULTY_DIFFICULTY_BLOCK_VERSION      = 1;
 
-const uint64_t LWMA_2_DIFFICULTY_BLOCK_INDEX                 = 0;
-const uint64_t LWMA_2_DIFFICULTY_BLOCK_INDEX_V2              = 0;
-const uint64_t LWMA_2_DIFFICULTY_BLOCK_INDEX_V3              = 0;
+const uint32_t EMISSION_SPEED_FACTOR                         = 23;
+const uint32_t EMISSION_SPEED_FACTOR_V2                      = 24;
+
+static_assert(EMISSION_SPEED_FACTOR    <= 8 * sizeof(uint64_t), "Bad EMISSION_SPEED_FACTOR");
+static_assert(EMISSION_SPEED_FACTOR_V2 <= 8 * sizeof(uint64_t), "Bad EMISSION_SPEED_FACTOR");
 
 /* Height to swap to EMISSION_SPEED_FACTOR_V2 */
-const uint64_t EMISSION_SPEED_FACTOR_V2_HEIGHT               = 700000; // Date of fork ... 2019
-const unsigned EMISSION_SPEED_FACTOR                         = 23;
-const unsigned EMISSION_SPEED_FACTOR_V2                      = 24;
-static_assert(EMISSION_SPEED_FACTOR <= 8 * sizeof(uint64_t), "Bad EMISSION_SPEED_FACTOR");
-static_assert(EMISSION_SPEED_FACTOR_V2 <= 8 * sizeof(uint64_t), "Bad EMISSION_SPEED_FACTOR_V2");
+const uint64_t EMISSION_SPEED_FACTOR_V2_HEIGHT               = 700000;
 
 /* Premine amount */
 const uint64_t GENESIS_BLOCK_REWARD                          = UINT64_C(0);
@@ -94,69 +84,33 @@ const size_t   CRYPTONOTE_COINBASE_BLOB_RESERVED_SIZE        = 600;
 
 const size_t   CRYPTONOTE_DISPLAY_DECIMAL_POINT              = 2;
 
-const uint64_t MINIMUM_FEE                                   = UINT64_C(10); //
+const uint64_t MINIMUM_FEE                                   = UINT64_C(10);
 
 /* This section defines our minimum and maximum mixin counts required for transactions */
-const uint64_t MINIMUM_MIXIN_V1                              = 0;
-const uint64_t MAXIMUM_MIXIN_V1                              = 7; //
-
-const uint64_t MINIMUM_MIXIN_V2                              = 0; //
-const uint64_t MAXIMUM_MIXIN_V2                              = 3; //
-
-const uint64_t MINIMUM_MIXIN_V3                              = 0; //
-const uint64_t MAXIMUM_MIXIN_V3                              = 3; //
-
-/* The heights to activate the mixin limits at */
-const uint32_t MIXIN_LIMITS_V1_HEIGHT                        = 0;
-const uint32_t MIXIN_LIMITS_V2_HEIGHT                        = 5000000; // unused
-const uint32_t MIXIN_LIMITS_V3_HEIGHT                        = 10000000; // unused
+const uint64_t MINIMUM_MIXIN_V0                              = 0;
+const uint64_t MAXIMUM_MIXIN_V0                              = 7;
 
 /* The mixin to use by default with zedwallet and turtle-service */
-/* DEFAULT_MIXIN_V0 is the mixin used before MIXIN_LIMITS_V1_HEIGHT is started */
-const uint64_t DEFAULT_MIXIN_V0                              = 1;
-const uint64_t DEFAULT_MIXIN_V1                              = 1;
-const uint64_t DEFAULT_MIXIN_V2                              = 1; //
-const uint64_t DEFAULT_MIXIN_V3                              = 1; //
+const uint64_t DEFAULT_MIXIN_V0                              = 3;
 
 const uint64_t DEFAULT_DUST_THRESHOLD                        = UINT64_C(0);
-const uint64_t DEFAULT_DUST_THRESHOLD_V2                     = DEFAULT_DUST_THRESHOLD; // unused
 
-const uint32_t DUST_THRESHOLD_V2_HEIGHT                      = 0; // unused
-const uint32_t FUSION_DUST_THRESHOLD_HEIGHT_V2               = 0; // unused
 const uint64_t EXPECTED_NUMBER_OF_BLOCKS_PER_DAY             = 24 * 60 * 60 / DIFFICULTY_TARGET;
 
-const size_t   DIFFICULTY_WINDOW                             = 60;
-const size_t   DIFFICULTY_WINDOW_V1                          = 60;
-const size_t   DIFFICULTY_WINDOW_V2                          = 60;
-const uint64_t DIFFICULTY_WINDOW_V3                          = 60;
+const uint64_t DIFFICULTY_WINDOW                             = 60;
 const uint64_t DIFFICULTY_BLOCKS_COUNT                       = DIFFICULTY_WINDOW + 1;
-const uint64_t DIFFICULTY_BLOCKS_COUNT_V3                    = DIFFICULTY_WINDOW_V3 + 1;
-
-const size_t   DIFFICULTY_CUT                                = 60;  // timestamps to cut after sorting
-const size_t   DIFFICULTY_CUT_V1                             = 60;
-const size_t   DIFFICULTY_CUT_V2                             = 60;
-const size_t   DIFFICULTY_LAG                                = 0;  // !!!
-const size_t   DIFFICULTY_LAG_V1                             = 0;
-const size_t   DIFFICULTY_LAG_V2                             = 0;
-// static_assert(2 * DIFFICULTY_CUT <= DIFFICULTY_WINDOW - 2, "Bad DIFFICULTY_WINDOW or DIFFICULTY_CUT");
 
 const size_t   MAX_BLOCK_SIZE_INITIAL                        = 100000;
 const uint64_t MAX_BLOCK_SIZE_GROWTH_SPEED_NUMERATOR         = 100 * 1024;
 const uint64_t MAX_BLOCK_SIZE_GROWTH_SPEED_DENOMINATOR       = 365 * 24 * 60 * 60 / DIFFICULTY_TARGET;
-const uint64_t MAX_EXTRA_SIZE                                = 1024;
+const uint64_t MAX_EXTRA_SIZE                                = 140000;
 const uint64_t MAX_EXTRA_SIZE_V2                             = 1024;
-const uint64_t MAX_EXTRA_SIZE_V2_HEIGHT                      = 5000000; //
+const uint64_t MAX_EXTRA_SIZE_V2_HEIGHT                      = 700000;
 
-/* For new projects forked from this code base, the values immediately below
-   should be changed to 0 to prevent issues with transaction processing 
-   and other possible unexpected behavior */
-const uint64_t TRANSACTION_SIGNATURE_COUNT_VALIDATION_HEIGHT = 0;
-const uint64_t BLOCK_BLOB_SHUFFLE_CHECK_HEIGHT               = 0;
-const uint64_t TRANSACTION_INPUT_BLOCKTIME_VALIDATION_HEIGHT = 0;
+/* For new projects forked from this code base, this value should be
+   changed to 0 to prevent a possible transaction bloat exploit */
+const uint64_t TRANSACTION_SIGNATURE_COUNT_VALIDATION_HEIGHT = 700000;
 
-/* This describes how many blocks of "wiggle" room transactions have regarding
-   when the outputs can be spent based on a reasonable belief that the outputs
-   would unlock in the current block period */
 const uint64_t CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_BLOCKS     = 1;
 const uint64_t CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_SECONDS    = DIFFICULTY_TARGET * CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_BLOCKS;
 
@@ -225,18 +179,6 @@ const uint8_t  BLOCK_MAJOR_VERSION_5                         =  5;
 const uint8_t  BLOCK_MINOR_VERSION_0                         =  0;
 const uint8_t  BLOCK_MINOR_VERSION_1                         =  1;
 
-const std::unordered_map<
-    uint8_t,
-    std::function<void(const void *data, size_t length, Crypto::Hash &hash)>
-> HASHING_ALGORITHMS_BY_BLOCK_VERSION =
-{
-    { BLOCK_MAJOR_VERSION_1, Crypto::cn_slow_hash_v0 },             /* From zero */
-    { BLOCK_MAJOR_VERSION_2, Crypto::cn_slow_hash_v0 },             /* UPGRADE_HEIGHT_V2 */
-    { BLOCK_MAJOR_VERSION_3, Crypto::cn_slow_hash_v0 },             /* UPGRADE_HEIGHT_V3 */
-    { BLOCK_MAJOR_VERSION_4, Crypto::cn_lite_slow_hash_v1 },        /* UPGRADE_HEIGHT_V4 */
-    { BLOCK_MAJOR_VERSION_5, Crypto::cn_turtle_lite_slow_hash_v2 }  /* UPGRADE_HEIGHT_V5 */
-};
-
 const size_t   BLOCKS_IDS_SYNCHRONIZING_DEFAULT_COUNT        =  10000;  //by default, blocks ids count in synchronizing
 const uint64_t BLOCKS_SYNCHRONIZING_DEFAULT_COUNT            =  100;    //by default, blocks count in blocks downloading
 const size_t   COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT         =  1000;
@@ -261,7 +203,7 @@ const uint8_t P2P_LITE_BLOCKS_PROPOGATION_VERSION            = 0;
 const uint8_t  P2P_UPGRADE_WINDOW                            = 2;
 
 const size_t   P2P_CONNECTION_MAX_WRITE_BUFFER_SIZE          = 32 * 1024 * 1024; // 32 MB
-const uint32_t P2P_DEFAULT_CONNECTIONS_COUNT                 = 32;
+const uint32_t P2P_DEFAULT_CONNECTIONS_COUNT                 = 8;
 const size_t   P2P_DEFAULT_WHITELIST_CONNECTIONS_PERCENT     = 70;
 const uint32_t P2P_DEFAULT_HANDSHAKE_INTERVAL                = 60;            // seconds
 const uint32_t P2P_DEFAULT_PACKET_MAX_SIZE                   = 50000000;      // 50000000 bytes maximum packet size
@@ -272,10 +214,10 @@ const uint64_t P2P_DEFAULT_INVOKE_TIMEOUT                    = 60 * 2 * 1000; //
 const size_t   P2P_DEFAULT_HANDSHAKE_INVOKE_TIMEOUT          = 5000;          // 5 seconds
 const char     P2P_STAT_TRUSTED_PUB_KEY[]                    = "";
 
-const uint64_t DATABASE_WRITE_BUFFER_MB_DEFAULT_SIZE         = 1024; // 1 GB
-const uint64_t DATABASE_READ_BUFFER_MB_DEFAULT_SIZE          = 1024; // 1 GB
-const uint32_t DATABASE_DEFAULT_MAX_OPEN_FILES               = 500; // 500 files
-const uint16_t DATABASE_DEFAULT_BACKGROUND_THREADS_COUNT     = 10; // 4 DB threads
+const uint64_t DATABASE_WRITE_BUFFER_MB_DEFAULT_SIZE         = 1024;          // 1 GB
+const uint64_t DATABASE_READ_BUFFER_MB_DEFAULT_SIZE          = 1024;          // 1 GB
+const uint32_t DATABASE_DEFAULT_MAX_OPEN_FILES               = 500;           // 500 files
+const uint16_t DATABASE_DEFAULT_BACKGROUND_THREADS_COUNT     = 10;            // 10 DB threads
 
 const char     LATEST_VERSION_URL[]                          = "https://github.com/derogold/derogold/releases";
 const std::string LICENSE_URL                                = "https://github.com/derogold/derogold/blob/master/LICENSE";

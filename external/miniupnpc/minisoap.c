@@ -1,8 +1,7 @@
-/* $Id: minisoap.c,v 1.25 2017/04/21 10:03:24 nanard Exp $ */
-/* vim: tabstop=4 shiftwidth=4 noexpandtab
- * Project : miniupnp
+/* $Id: minisoap.c,v 1.22 2012/01/21 13:30:31 nanard Exp $ */
+/* Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2005-2018 Thomas Bernard
+ * Copyright (c) 2005-2012 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution.
  *
@@ -26,7 +25,7 @@
 #include <stdlib.h>
 
 #ifdef _WIN32
-#define PRINT_SOCKET_ERROR(x)    fprintf(stderr, "Socket error: %s, %d\n", x, WSAGetLastError());
+#define PRINT_SOCKET_ERROR(x)    printf("Socket error: %s, %d\n", x, WSAGetLastError());
 #else
 #define PRINT_SOCKET_ERROR(x) perror(x)
 #endif
@@ -34,7 +33,7 @@
 /* httpWrite sends the headers and the body to the socket
  * and returns the number of bytes sent */
 static int
-httpWrite(SOCKET fd, const char * body, int bodysize,
+httpWrite(int fd, const char * body, int bodysize,
           const char * headers, int headerssize)
 {
 	int n = 0;
@@ -44,10 +43,10 @@ httpWrite(SOCKET fd, const char * body, int bodysize,
 	/* Note : my old linksys router only took into account
 	 * soap request that are sent into only one packet */
 	char * p;
-	/* TODO: AVOID MALLOC, we could use writev() for that */
+	/* TODO: AVOID MALLOC */
 	p = malloc(headerssize+bodysize);
 	if(!p)
-	  return -1;
+	  return 0;
 	memcpy(p, headers, headerssize);
 	memcpy(p+headerssize, body, bodysize);
 	/*n = write(fd, p, headerssize+bodysize);*/
@@ -56,7 +55,7 @@ httpWrite(SOCKET fd, const char * body, int bodysize,
 	  PRINT_SOCKET_ERROR("send");
 	}
 	/* disable send on the socket */
-	/* draytek routers don't seem to like that... */
+	/* draytek routers dont seems to like that... */
 #if 0
 #ifdef _WIN32
 	if(shutdown(fd, SD_SEND)<0) {
@@ -71,7 +70,7 @@ httpWrite(SOCKET fd, const char * body, int bodysize,
 }
 
 /* self explanatory  */
-int soapPostSubmit(SOCKET fd,
+int soapPostSubmit(int fd,
                    const char * url,
 				   const char * host,
 				   unsigned short port,
@@ -97,7 +96,7 @@ int soapPostSubmit(SOCKET fd,
 	headerssize = snprintf(headerbuf, sizeof(headerbuf),
                        "POST %s HTTP/%s\r\n"
 	                   "Host: %s%s\r\n"
-					   "User-Agent: " OS_STRING ", " UPNP_VERSION_STRING ", MiniUPnPc/" MINIUPNPC_VERSION_STRING "\r\n"
+					   "User-Agent: " OS_STRING ", UPnP/1.0, MiniUPnPc/" MINIUPNPC_VERSION_STRING "\r\n"
 	                   "Content-Length: %d\r\n"
 					   "Content-Type: text/xml\r\n"
 					   "SOAPAction: \"%s\"\r\n"
@@ -106,8 +105,6 @@ int soapPostSubmit(SOCKET fd,
 					   "Pragma: no-cache\r\n"
 					   "\r\n",
 					   url, httpversion, host, portstr, bodysize, action);
-	if ((unsigned int)headerssize >= sizeof(headerbuf))
-		return -1;
 #ifdef DEBUG
 	/*printf("SOAP request : headersize=%d bodysize=%d\n",
 	       headerssize, bodysize);

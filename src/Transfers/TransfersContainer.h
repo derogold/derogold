@@ -29,7 +29,7 @@
 
 #include "crypto/crypto.h"
 #include "CryptoNoteCore/CryptoNoteBasic.h"
-#include "Serialization/CryptoNoteSerialization.h"
+#include "CryptoNoteCore/CryptoNoteSerialization.h"
 #include "CryptoNoteCore/Currency.h"
 #include "Logging/LoggerRef.h"
 #include "Serialization/ISerializer.h"
@@ -164,9 +164,6 @@ public:
   //only type flags are feasible for this function
   virtual std::vector<TransactionOutputInformation> getTransactionInputs(const Crypto::Hash& transactionHash, uint32_t flags) const override;
   virtual void getUnconfirmedTransactions(std::vector<Crypto::Hash>& transactions) const override;
-
-  virtual std::vector<SpentTransactionOutput> getUnspentInputs() const override;
-  virtual std::vector<SpentTransactionOutput> getSpentInputs() const override;
 
   // IStreamSerializable
   virtual void save(std::ostream& os) override;

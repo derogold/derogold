@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <config/CryptoNoteConfig.h>
-
 namespace Constants
 {
     /* We use this to check that the file is a wallet file, this bit does
@@ -41,15 +39,11 @@ namespace Constants
     const uint16_t WALLET_FILE_FORMAT_VERSION = 0;
 
     /* How large should the m_lastKnownBlockHashes container be */
-    const size_t LAST_KNOWN_BLOCK_HASHES_SIZE = 50;
+    const uint32_t LAST_KNOWN_BLOCK_HASHES_SIZE = 100;
 
     /* Save a block hash checkpoint every BLOCK_HASH_CHECKPOINTS_INTERVAL
        blocks */
     const uint32_t BLOCK_HASH_CHECKPOINTS_INTERVAL = 5000;
-
-    /* The amount of blocks since an input has been spent that we remove it
-       from the container */
-    const uint64_t PRUNE_SPENT_INPUTS_INTERVAL = CryptoNote::parameters::EXPECTED_NUMBER_OF_BLOCKS_PER_DAY * 2;
 
     /* When we get the global indexes, we pass in a range of blocks, to obscure
        which transactions we are interested in - the ones that belong to us.
@@ -61,9 +55,17 @@ namespace Constants
        This value determines how many blocks to take from. */
     const uint64_t GLOBAL_INDEXES_OBSCURITY = 10;
 
-    /* Amount of blocks to take in one chunk from the block downloader, and
-       then split into threads and process. Too large will result in large
-       jumps in the sync height, but should offer better performance from a
-       decrease in locking of data structures. */
-    const uint64_t BLOCK_PROCESSING_CHUNK = 500;
+    /* The maximum amount of blocks we can have waiting to be processed in
+       the queue. If we exceed this, we will wait till it drops below this
+       amount. */
+    const uint32_t MAXIMUM_SYNC_QUEUE_SIZE = 1000;
+
+    /* Handy if we don't want to use a secret key (for example, for view wallets)
+       and want to make it explicit that this is uninitialized. */
+    const Crypto::SecretKey BLANK_SECRET_KEY = Crypto::SecretKey({
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+    });
 }

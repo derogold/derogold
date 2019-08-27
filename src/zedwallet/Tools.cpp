@@ -12,15 +12,14 @@
 #include <Common/StringTools.h>
 
 #include <CryptoNoteCore/CryptoNoteBasicImpl.h>
-#include <Common/CryptoNoteTools.h>
-#include <Common/TransactionExtra.h>
+#include <CryptoNoteCore/CryptoNoteTools.h>
+#include <CryptoNoteCore/TransactionExtra.h>
 
 #include <fstream>
 
 #include <iostream>
 
 #include <Utilities/ColouredMsg.h>
-#include <Utilities/Addresses.h>
 #include <zedwallet/PasswordContainer.h>
 #include <config/WalletConfig.h>
 
@@ -168,6 +167,30 @@ bool confirm(const std::string &msg, const bool defaultReturn)
     }
 }
 
+std::string getPaymentIDFromExtra(const std::string &extra)
+{
+    std::string paymentID;
+
+    if (extra.length() > 0)
+    {
+        std::vector<uint8_t> vecExtra;
+
+        for (const auto it : extra)
+        {
+            vecExtra.push_back(static_cast<uint8_t>(it));
+        }
+
+        Crypto::Hash paymentIdHash;
+
+        if (CryptoNote::getPaymentIdFromTxExtra(vecExtra, paymentIdHash))
+        {
+            return Common::podToHex(paymentIdHash);
+        }
+    }
+
+    return paymentID;
+}
+
 std::string unixTimeToDate(const uint64_t timestamp)
 {
     const std::time_t time = timestamp;
@@ -184,7 +207,7 @@ std::string createIntegratedAddress(const std::string &address,
     CryptoNote::AccountPublicAddress addr;
 
     /* Get the private + public key from the address */
-    Utilities::parseAccountAddressString(prefix, addr, address);
+    CryptoNote::parseAccountAddressString(prefix, addr, address);
 
     /* Pack as a binary array */
     CryptoNote::BinaryArray ba;

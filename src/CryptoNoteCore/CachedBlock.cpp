@@ -7,7 +7,7 @@
 #include "CachedBlock.h"
 #include <Common/Varint.h>
 #include <config/CryptoNoteConfig.h>
-#include "Common/CryptoNoteTools.h"
+#include "CryptoNoteTools.h"
 
 using namespace Crypto;
 using namespace CryptoNote;
@@ -46,32 +46,30 @@ const Crypto::Hash& CachedBlock::getBlockHash() const {
   return blockHash.get();
 }
 
-const Crypto::Hash& CachedBlock::getBlockLongHash() const
-{
-    if (blockLongHash.is_initialized())
-    {
-        return blockLongHash.get();
+const Crypto::Hash& CachedBlock::getBlockLongHash() const {
+  if (!blockLongHash.is_initialized()) {
+    if (block.majorVersion == BLOCK_MAJOR_VERSION_1) {
+      const auto& rawHashingBlock = getBlockHashingBinaryArray();
+      blockLongHash = Hash();
+      cn_slow_hash_v0(rawHashingBlock.data(), rawHashingBlock.size(), blockLongHash.get());
+    } else if ((block.majorVersion == BLOCK_MAJOR_VERSION_2) || (block.majorVersion == BLOCK_MAJOR_VERSION_3)) {
+      const auto& rawHashingBlock = getParentBlockHashingBinaryArray(true);
+      blockLongHash = Hash();
+      cn_slow_hash_v0(rawHashingBlock.data(), rawHashingBlock.size(), blockLongHash.get());
+    } else if (block.majorVersion == BLOCK_MAJOR_VERSION_4) {
+      const auto& rawHashingBlock = getParentBlockHashingBinaryArray(true);
+      blockLongHash = Hash();
+      cn_lite_slow_hash_v1(rawHashingBlock.data(), rawHashingBlock.size(), blockLongHash.get());
+    } else if (block.majorVersion >= BLOCK_MAJOR_VERSION_5) {
+      const auto& rawHashingBlock = getParentBlockHashingBinaryArray(true);
+      blockLongHash = Hash();
+      cn_turtle_lite_slow_hash_v2(rawHashingBlock.data(), rawHashingBlock.size(), blockLongHash.get());
+    } else {
+      throw std::runtime_error("Unknown block major version.");
     }
+  }
 
-    const std::vector<uint8_t> &rawHashingBlock = block.majorVersion == CryptoNote::BLOCK_MAJOR_VERSION_1
-        ? getBlockHashingBinaryArray()
-        : getParentBlockHashingBinaryArray(true);
-
-    blockLongHash = Hash();
-
-    try
-    {
-        const auto hashingAlgorithm
-            = CryptoNote::HASHING_ALGORITHMS_BY_BLOCK_VERSION.at(block.majorVersion);
-
-        hashingAlgorithm(rawHashingBlock.data(), rawHashingBlock.size(), blockLongHash.get());
-
-        return blockLongHash.get();
-    }
-    catch (const std::out_of_range &)
-    {
-        throw std::runtime_error("Unknown block major version.");
-    }
+  return blockLongHash.get();
 }
 
 const Crypto::Hash& CachedBlock::getAuxiliaryBlockHeaderHash() const {

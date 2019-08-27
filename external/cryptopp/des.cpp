@@ -284,16 +284,14 @@ namespace {
 void RawDES::RawSetKey(CipherDir dir, const byte *key)
 {
 #if (_MSC_VER >= 1600) || (__cplusplus >= 201103L)
-# define REGISTER /* Define to nothing for C++11 and above */
-#else
-# define REGISTER register
+# define register /* Define to nothing for C++11 and above */
 #endif
 
 	SecByteBlock buffer(56+56+8);
 	byte *const pc1m=buffer;                 /* place to modify pc1 into */
 	byte *const pcr=pc1m+56;                 /* place to rotate pc1 into */
 	byte *const ks=pcr+56;
-	REGISTER int i,j,l;
+	register int i,j,l;
 	int m;
 
 	for (j=0; j<56; j++) {          /* convert pc1 to bits of key */

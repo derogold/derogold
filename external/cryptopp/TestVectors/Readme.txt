@@ -24,8 +24,7 @@ before the Test field.
 Data Types
 ==========
 
-signed int - small integer (less than 2^32) in decimal representation
-unsigned long - large integer (less than 2^64) convertible by strtoul or strtoull
+int - small integer (less than 2^32) in decimal representation
 string - human readable string
 encoded string - can be one of the following
 	- quoted string: "message" means "message" without the quotes
@@ -69,7 +68,6 @@ DerivedLength - encoded string
 Digest - encoded string
 TruncatedSize - int, size of truncated digest in bytes
 Seek - int, seek location for random access ciphers
-Seek64 - unsigned long, seek location for random access ciphers
 (more to come here)
 
 Possible Tests

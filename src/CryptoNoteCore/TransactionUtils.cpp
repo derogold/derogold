@@ -22,7 +22,7 @@
 #include "crypto/crypto.h"
 #include "CryptoNoteCore/Account.h"
 #include "CryptoNoteFormatUtils.h"
-#include "Common/TransactionExtra.h"
+#include "TransactionExtra.h"
 
 using namespace Crypto;
 

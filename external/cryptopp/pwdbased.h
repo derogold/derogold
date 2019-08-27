@@ -12,7 +12,6 @@
 #include "hrtimer.h"
 #include "integer.h"
 #include "argnames.h"
-#include "algparam.h"
 #include "hmac.h"
 
 NAMESPACE_BEGIN(CryptoPP)

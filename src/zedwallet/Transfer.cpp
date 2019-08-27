@@ -12,10 +12,10 @@
 #include <config/CryptoNoteConfig.h>
 
 #include <CryptoNoteCore/CryptoNoteBasicImpl.h>
-#include <Common/CryptoNoteTools.h>
-#include <Common/TransactionExtra.h>
+#include <CryptoNoteCore/CryptoNoteTools.h>
+#include <CryptoNoteCore/TransactionExtra.h>
 
-#include "WalletGreenTypes.h"
+#include "IWallet.h"
 
 #include <NodeRpcProxy/NodeErrors.h>
 
@@ -28,9 +28,6 @@
 
 #include <Wallet/WalletGreen.h>
 #include <Wallet/WalletUtils.h>
-
-#include <Utilities/Addresses.h>
-#include <Utilities/ParseExtra.h>
 
 bool parseAmount(std::string strAmount, uint64_t &amount)
 {
@@ -106,7 +103,7 @@ bool confirmTransaction(CryptoNote::TransactionParameters t,
               << "," << std::endl
               << "and a node fee of " << SuccessMsg(formatAmount(nodeFee));
 
-    const std::string paymentID = Utilities::getPaymentIDFromExtra(Common::asBinaryArray(t.extra));
+    const std::string paymentID = getPaymentIDFromExtra(t.extra);
 
     /* Lets not split the integrated address out into its address and
        payment ID combo. It'll confused users. */
@@ -948,7 +945,7 @@ Maybe<std::pair<std::string, std::string>> extractIntegratedAddress(
 
     /* Parse the AccountPublicAddress into a standard wallet address */
     /* Use the calculated prefix from earlier for less typing :p */
-    std::string address = Utilities::getAccountAddressAsStr(prefix, addr);
+    std::string address = CryptoNote::getAccountAddressAsStr(prefix, addr);
 
     /* The address out should of course be a valid address */
     if (!parseStandardAddress(address))
@@ -1052,7 +1049,7 @@ bool parseStandardAddress(std::string address, bool printErrors)
 
     CryptoNote::AccountPublicAddress addr;
 
-    const bool valid = Utilities::parseAccountAddressString(prefix, addr,
+    const bool valid = CryptoNote::parseAccountAddressString(prefix, addr,
                                                              address);
 
     if (address.length() != WalletConfig::standardAddressLength)

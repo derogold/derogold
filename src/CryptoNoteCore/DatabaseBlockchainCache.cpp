@@ -18,17 +18,16 @@
 #include "crypto/hash.h"
 
 #include <CryptoNoteCore/BlockchainStorage.h>
+#include <CryptoNoteCore/CryptoNoteTools.h>
 #include <CryptoNoteCore/CryptoNoteBasicImpl.h>
-
-#include <Common/TransactionExtra.h>
-#include <Common/CryptoNoteTools.h>
+#include "CryptoNoteCore/TransactionExtra.h"
 
 namespace CryptoNote {
 
 namespace {
 
 const uint32_t ONE_DAY_SECONDS = 60 * 60 * 24;
-const CachedBlockInfo NULL_CACHED_BLOCK_INFO {Constants::NULL_HASH, 0, 0, 0, 0, 0};
+const CachedBlockInfo NULL_CACHED_BLOCK_INFO {NULL_HASH, 0, 0, 0, 0, 0};
 
 bool requestPackedOutputs(IBlockchainCache::Amount amount, Common::ArrayView<uint32_t> globalIndexes, IDataBase& database, std::vector<PackedOutIndex>& result) {
   BlockchainReadBatch readBatch;
@@ -960,22 +959,11 @@ bool DatabaseBlockchainCache::isTransactionSpendTimeUnlocked(uint64_t unlockTime
   return isTransactionSpendTimeUnlocked(unlockTime, getTopBlockIndex());
 }
 
+// TODO: pass time
 bool DatabaseBlockchainCache::isTransactionSpendTimeUnlocked(uint64_t unlockTime, uint32_t blockIndex) const {
   if (unlockTime < currency.maxBlockHeight()) {
     // interpret as block index
     return blockIndex + currency.lockedTxAllowedDeltaBlocks() >= unlockTime;
-  }
-
-  if (blockIndex >= CryptoNote::parameters::TRANSACTION_INPUT_BLOCKTIME_VALIDATION_HEIGHT)
-  {
-    /* Get the last block timestamp from an existing method call */
-    const std::vector<uint64_t> lastBlockTimestamps = getLastTimestamps(1);
-
-    /* Pop the last timestamp off the vector */
-    const uint64_t lastBlockTimestamp = lastBlockTimestamps.at(0);
-
-    /* Compare our delta seconds plus our last time stamp against the unlock time */
-    return lastBlockTimestamp + currency.lockedTxAllowedDeltaSeconds() >= unlockTime;
   }
 
   // interpret as time
@@ -1147,9 +1135,9 @@ uint64_t DatabaseBlockchainCache::getDifficultyForNextBlock() const {
 uint64_t DatabaseBlockchainCache::getDifficultyForNextBlock(uint32_t blockIndex) const {
   assert(blockIndex <= getTopBlockIndex());
   uint8_t nextBlockMajorVersion = getBlockMajorVersionForHeight(blockIndex+1);
-  auto timestamps = getLastTimestamps(currency.difficultyBlocksCountByBlockVersion(nextBlockMajorVersion, blockIndex), blockIndex, UseGenesis{false});
+  auto timestamps = getLastTimestamps(CryptoNote::parameters::DIFFICULTY_BLOCKS_COUNT, blockIndex, UseGenesis{false});
   auto commulativeDifficulties =
-      getLastCumulativeDifficulties(currency.difficultyBlocksCountByBlockVersion(nextBlockMajorVersion, blockIndex), blockIndex, UseGenesis{false});
+      getLastCumulativeDifficulties(CryptoNote::parameters::DIFFICULTY_BLOCKS_COUNT, blockIndex, UseGenesis{false});
   return currency.getNextDifficulty(nextBlockMajorVersion, blockIndex, std::move(timestamps), std::move(commulativeDifficulties));
 }
 
@@ -1642,46 +1630,6 @@ std::vector<Crypto::Hash> DatabaseBlockchainCache::getBlockHashesByTimestamps(ui
   }
 
   return blockHashes;
-}
-
-std::vector<RawBlock> DatabaseBlockchainCache::getNonEmptyBlocks(
-    const uint64_t startHeight,
-    const size_t blockCount) const
-{
-    std::vector<RawBlock> orderedBlocks;
-
-    const uint32_t storageBlockCount = getBlockCount();
-
-    uint64_t height = startHeight;
-
-    while (orderedBlocks.size() < blockCount && height < storageBlockCount)
-    {
-        uint64_t startHeight = height;
-
-        /* Lets try taking the amount we need *2, to try and balance not needing
-           multiple DB requests to get the amount we need of non empty blocks, with
-           not taking too many */
-        uint64_t endHeight = startHeight + (blockCount * 2);
-
-        auto blockBatch = BlockchainReadBatch().requestRawBlocks(startHeight, endHeight);
-        const auto rawBlocks = readDatabase(blockBatch).getRawBlocks();
-
-        while (orderedBlocks.size() < blockCount && height < startHeight + rawBlocks.size())
-        {
-            const auto block = rawBlocks.at(height);
-            
-            height++;
-
-            if (block.transactions.empty())
-            {
-                continue;
-            }
-
-            orderedBlocks.push_back(block);
-        }
-    }
-
-    return orderedBlocks;
 }
 
 std::vector<RawBlock> DatabaseBlockchainCache::getBlocksByHeight(

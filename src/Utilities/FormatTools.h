@@ -28,6 +28,4 @@ namespace Utilities
     std::string formatAmountBasic(const uint64_t amount);
 
     std::string prettyPrintBytes(const uint64_t numBytes);
-
-    std::string unixTimeToDate(const uint64_t timestamp);
 }

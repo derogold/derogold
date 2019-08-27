@@ -8,6 +8,8 @@
 
 #include "CryptoTypes.h"
 
+#include "IWallet.h"
+
 #include "json.hpp"
 
 #include <SubWallets/SubWallet.h>

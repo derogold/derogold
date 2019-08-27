@@ -26,13 +26,58 @@
 #include <Errors/ValidateParameters.h>
 
 #include <Utilities/ColouredMsg.h>
-#include <Utilities/String.h>
-#include <Utilities/Utilities.h>
 
 namespace CryptoNote {
 
 namespace {
+
 const size_t CONCURRENCY_LEVEL = std::thread::hardware_concurrency();
+
+template <class Container>
+void split(const std::string& str, Container& cont, char delim = ' ')
+{
+    std::stringstream ss(str);
+    std::string token;
+
+    while (std::getline(ss, token, delim))
+    {
+        cont.push_back(token);
+    }
+}
+
+bool parseDaemonAddressFromString(std::string& host, int& port, const std::string& address)
+{
+    std::vector<std::string> parts;
+    split(address, parts, ':');
+
+    if (parts.empty())
+    {
+        return false;
+    }
+
+    if (parts.size() >= 2)
+    {
+        try
+        {
+            host = parts.at(0);
+            port = std::stoi(parts.at(1));
+            return true;
+        }
+        catch (const std::out_of_range &)
+        {
+            return false;
+        }
+        catch (const std::invalid_argument &)
+        {
+            return false;
+        }
+    }
+
+    host = parts.at(0);
+    port = CryptoNote::RPC_DEFAULT_PORT;
+    return true;
+}
+
 }
 
 MiningConfig::MiningConfig():
@@ -53,7 +98,7 @@ void MiningConfig::parse(int argc, char** argv)
         ("daemon-address", "The daemon [host:port] combination to use for node operations. This option overrides --daemon-host and --daemon-rpc-port", 
           cxxopts::value<std::string>(daemonAddress), "<host:port>")
         ("daemon-host", "The daemon host to use for node operations", cxxopts::value<std::string>(daemonHost)->default_value("127.0.0.1"), "<host>")
-        ("daemon-rpc-port", "The daemon RPC port to use for node operations", cxxopts::value<uint16_t>(daemonPort)->default_value(std::to_string(CryptoNote::RPC_DEFAULT_PORT)), "#")
+        ("daemon-rpc-port", "The daemon RPC port to use for node operations", cxxopts::value<int>(daemonPort)->default_value(std::to_string(CryptoNote::RPC_DEFAULT_PORT)), "#")
         ("scan-time", "Blockchain polling interval (seconds). How often miner will check the Blockchain for updates", cxxopts::value<size_t>(scanPeriod)->default_value("1"), "#");
 
     options.add_options("Mining")
@@ -103,14 +148,14 @@ void MiningConfig::parse(int argc, char** argv)
 
         std::cout << InformationMsg("What address do you want to mine to?: ");
         std::getline(std::cin, miningAddress);
-        Utilities::trim(miningAddress);
+        Common::trim(miningAddress);
 
         error = validateAddresses({miningAddress}, integratedAddressesAllowed);
     }
 
     if (!daemonAddress.empty())
     {
-        if (!Utilities::parseDaemonAddressFromString(daemonHost, daemonPort, daemonAddress))
+        if (!parseDaemonAddressFromString(daemonHost, daemonPort, daemonAddress))
         {
           throw std::runtime_error("Could not parse --daemon-address option");
         }

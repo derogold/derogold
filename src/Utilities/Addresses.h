@@ -6,8 +6,6 @@
 
 #include <CryptoNote.h>
 
-#include <Errors/Errors.h>
-
 #include <string>
 
 #include <vector>
@@ -27,17 +25,4 @@ namespace Utilities
     std::string privateKeysToAddress(
         const Crypto::SecretKey privateSpendKey,
         const Crypto::SecretKey privateViewKey);
-
-    std::tuple<Error, std::string> createIntegratedAddress(
-        const std::string address,
-        const std::string paymentID);
-
-    std::string getAccountAddressAsStr(
-        const uint64_t prefix,
-        const CryptoNote::AccountPublicAddress& adr);
-
-    bool parseAccountAddressString(
-        uint64_t& prefix,
-        CryptoNote::AccountPublicAddress& adr,
-        const std::string& str);
 }

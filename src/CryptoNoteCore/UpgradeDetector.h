@@ -115,66 +115,6 @@ namespace CryptoNote {
       }
     }
 
-    void blockPushed() {
-      assert(!m_blockchain.empty());
-
-      if (m_currency.upgradeHeight(m_targetVersion) != UNDEF_HEIGHT) {
-        if (m_blockchain.size() <= m_currency.upgradeHeight(m_targetVersion) + 1) {
-          assert(m_blockchain.back().bl.majorVersion <= m_targetVersion - 1);
-        } else {
-          assert(m_blockchain.back().bl.majorVersion >= m_targetVersion);
-        }
-
-      } else if (m_votingCompleteHeight != UNDEF_HEIGHT) {
-        assert(m_blockchain.size() > m_votingCompleteHeight);
-
-        if (m_blockchain.size() <= upgradeHeight()) {
-          assert(m_blockchain.back().bl.majorVersion == m_targetVersion - 1);
-
-          if (m_blockchain.size() % (60 * 60 / m_currency.difficultyTarget()) == 0) {
-            auto interval = m_currency.difficultyTarget() * (upgradeHeight() - m_blockchain.size() + 2);
-            time_t upgradeTimestamp = time(nullptr) + static_cast<time_t>(interval);
-            struct tm* upgradeTime = localtime(&upgradeTimestamp);;
-            char upgradeTimeStr[40];
-            strftime(upgradeTimeStr, 40, "%H:%M:%S %Y.%m.%d", upgradeTime);
-            CryptoNote::CachedBlock cachedBlock(m_blockchain.back().bl);
-
-            logger(Logging::TRACE, Logging::BRIGHT_GREEN) << "###### UPGRADE is going to happen after block index " << upgradeHeight() << " at about " <<
-              upgradeTimeStr << " (in " << Common::timeIntervalToString(interval) << ")! Current last block index " << (m_blockchain.size() - 1) <<
-              ", hash " << cachedBlock.getBlockHash();
-          }
-        } else if (m_blockchain.size() == upgradeHeight() + 1) {
-          assert(m_blockchain.back().bl.majorVersion == m_targetVersion - 1);
-
-          logger(Logging::TRACE, Logging::BRIGHT_GREEN) << "###### UPGRADE has happened! Starting from block index " << (upgradeHeight() + 1) <<
-            " blocks with major version below " << static_cast<int>(m_targetVersion) << " will be rejected!";
-        } else {
-          assert(m_blockchain.back().bl.majorVersion == m_targetVersion);
-        }
-
-      } else {
-        uint32_t lastBlockHeight = static_cast<uint32_t>(m_blockchain.size() - 1);
-        if (isVotingComplete(lastBlockHeight)) {
-          m_votingCompleteHeight = lastBlockHeight;
-          logger(Logging::TRACE, Logging::BRIGHT_GREEN) << "###### UPGRADE voting complete at block index " << m_votingCompleteHeight <<
-            "! UPGRADE is going to happen after block index " << upgradeHeight() << "!";
-        }
-      }
-    }
-
-    void blockPopped() {
-      if (m_votingCompleteHeight != UNDEF_HEIGHT) {
-        assert(m_currency.upgradeHeight(m_targetVersion) == UNDEF_HEIGHT);
-
-        if (m_blockchain.size() == m_votingCompleteHeight) {
-          logger(Logging::TRACE, Logging::BRIGHT_YELLOW) << "###### UPGRADE after block index " << upgradeHeight() << " has been canceled!";
-          m_votingCompleteHeight = UNDEF_HEIGHT;
-        } else {
-          assert(m_blockchain.size() > m_votingCompleteHeight);
-        }
-      }
-    }
-
     size_t getNumberOfVotes(uint32_t height) {
       if (height < m_currency.upgradeVotingWindow() - 1) {
         return 0;

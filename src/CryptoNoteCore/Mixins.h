@@ -10,18 +10,51 @@
 #include <CryptoNoteCore/CachedTransaction.h>
 #include <CryptoNoteCore/TransactionApi.h>
 
-#include <Utilities/Mixins.h>
+#include <Wallet/WalletErrors.h>
 
 namespace CryptoNote
 {
   class Mixins
   {
     public:
+
+      /* Returns {minMixin, maxMixin, defaultMixin} */
+      static std::tuple<uint64_t, uint64_t, uint64_t> getMixinAllowableRange(const uint64_t height)
+      {
+        uint64_t minMixin = CryptoNote::parameters::MINIMUM_MIXIN_V0;
+        uint64_t maxMixin = CryptoNote::parameters::MAXIMUM_MIXIN_V0;
+        uint64_t defaultMixin = CryptoNote::parameters::DEFAULT_MIXIN_V0;
+
+        return {minMixin, maxMixin, defaultMixin};
+      }
+
+      /* This method is used by WalletService to determine if the mixin amount is correct
+         for the current block height */
+      static std::tuple<bool, std::string, std::error_code> validate(const uint64_t mixin, const uint64_t height)
+      {
+        auto [minMixin, maxMixin, defaultMixin] = getMixinAllowableRange(height);
+
+        std::stringstream str;
+
+        if (mixin < minMixin)
+        {
+          str << "Mixin of " << mixin << " under minimum mixin threshold of " << minMixin;
+          return {false, str.str(), make_error_code(CryptoNote::error::MIXIN_BELOW_THRESHOLD)};
+        }
+        else if (mixin > maxMixin)
+        {
+          str << "Mixin of " << mixin << " above maximum mixin threshold of " << maxMixin;
+          return {false, str.str(), make_error_code(CryptoNote::error::MIXIN_ABOVE_THRESHOLD)};
+        }
+
+        return {true, std::string(), std::error_code()};
+      }
+
       /* This method is commonly used by the node to determine if the transactions in the vector have
          the correct mixin (anonymity) as defined by the current rules */
       static std::tuple<bool, std::string> validate(std::vector<CachedTransaction> transactions, uint64_t height)
       {
-        auto [minMixin, maxMixin, defaultMixin] = Utilities::getMixinAllowableRange(height);
+        auto [minMixin, maxMixin, defaultMixin] = getMixinAllowableRange(height);
 
         for (const auto& transaction : transactions)
         {

@@ -1,5 +1,5 @@
 // Copyright (c) 2018-2019, The TurtleCoin Developers
-//
+// 
 // Please see the included LICENSE file for more information.
 
 ////////////////////////////////////
@@ -28,28 +28,18 @@
 
 #include <WalletBackend/JsonSerialization.h>
 
-#include <Utilities/Addresses.h>
-
 using namespace httplib;
 
 ApiDispatcher::ApiDispatcher(
     const uint16_t bindPort,
     const std::string rpcBindIp,
     const std::string rpcPassword,
-    const std::string corsHeader,
-    unsigned int walletSyncThreads) :
+    const std::string corsHeader) :
     m_port(bindPort),
     m_host(rpcBindIp),
     m_corsHeader(corsHeader),
     m_rpcPassword(rpcPassword)
 {
-    if (walletSyncThreads == 0)
-    {
-        walletSyncThreads = 1;
-    }
-
-    m_walletSyncThreads = walletSyncThreads;
-
     /* Generate the salt used for pbkdf2 api authentication */
     Random::randomBytes(16, m_salt);
 
@@ -61,7 +51,7 @@ ApiDispatcher::ApiDispatcher(
     /* Route the request through our middleware function, before forwarding
        to the specified function */
     const auto router = [this](const auto function,
-                               const WalletState walletState,
+                               const bool walletMustBeOpen,
                                const bool viewWalletPermitted)
     {
         return [=](const Request &req, Response &res)
@@ -69,144 +59,147 @@ ApiDispatcher::ApiDispatcher(
             /* Pass the inputted function with the arguments passed through
                to middleware */
             middleware(
-                req, res, walletState, viewWalletPermitted,
+                req, res, walletMustBeOpen, viewWalletPermitted,
                 std::bind(function, this, _1, _2, _3)
             );
         };
     };
 
+    /* Makes the below router function easier to parse */
+    const bool walletMustBeOpen = true;
+
+    const bool walletMustBeClosed = false;
+
     const bool viewWalletsAllowed = true;
+
     const bool viewWalletsBanned = false;
 
     /* POST */
-    m_server.Post("/wallet/open", router(&ApiDispatcher::openWallet, WalletMustBeClosed, viewWalletsAllowed))
+    m_server.Post("/wallet/open", router(&ApiDispatcher::openWallet, walletMustBeClosed, viewWalletsAllowed))
 
             /* Import wallet with keys */
-            .Post("/wallet/import/key", router(&ApiDispatcher::keyImportWallet, WalletMustBeClosed, viewWalletsAllowed))
+            .Post("/wallet/import/key", router(&ApiDispatcher::keyImportWallet, walletMustBeClosed, viewWalletsAllowed))
 
             /* Import wallet with seed */
-            .Post("/wallet/import/seed", router(&ApiDispatcher::seedImportWallet, WalletMustBeClosed, viewWalletsAllowed))
+            .Post("/wallet/import/seed", router(&ApiDispatcher::seedImportWallet, walletMustBeClosed, viewWalletsAllowed))
 
             /* Import view wallet */
-            .Post("/wallet/import/view", router(&ApiDispatcher::importViewWallet, WalletMustBeClosed, viewWalletsAllowed))
+            .Post("/wallet/import/view", router(&ApiDispatcher::importViewWallet, walletMustBeClosed, viewWalletsAllowed))
 
             /* Create wallet */
-            .Post("/wallet/create", router(&ApiDispatcher::createWallet, WalletMustBeClosed, viewWalletsAllowed))
+            .Post("/wallet/create", router(&ApiDispatcher::createWallet, walletMustBeClosed, viewWalletsAllowed))
 
             /* Create a random address */
-            .Post("/addresses/create", router(&ApiDispatcher::createAddress, WalletMustBeOpen, viewWalletsBanned))
+            .Post("/addresses/create", router(&ApiDispatcher::createAddress, walletMustBeOpen, viewWalletsBanned))
 
             /* Import an address with a spend secret key */
-            .Post("/addresses/import", router(&ApiDispatcher::importAddress, WalletMustBeOpen, viewWalletsBanned))
+            .Post("/addresses/import", router(&ApiDispatcher::importAddress, walletMustBeOpen, viewWalletsBanned))
 
             /* Import a view only address with a public spend key */
-            .Post("/addresses/import/view", router(&ApiDispatcher::importViewAddress, WalletMustBeOpen, viewWalletsAllowed))
-
-            /* Validate an address */
-            .Post("/addresses/validate", router(&ApiDispatcher::validateAddress, DoesntMatter, viewWalletsAllowed))
+            .Post("/addresses/import/view", router(&ApiDispatcher::importViewAddress, walletMustBeOpen, viewWalletsAllowed))
 
             /* Send a transaction */
-            .Post("/transactions/send/basic", router(&ApiDispatcher::sendBasicTransaction, WalletMustBeOpen, viewWalletsBanned))
+            .Post("/transactions/send/basic", router(&ApiDispatcher::sendBasicTransaction, walletMustBeOpen, viewWalletsBanned))
 
             /* Send a transaction, more parameters specified */
-            .Post("/transactions/send/advanced", router(&ApiDispatcher::sendAdvancedTransaction, WalletMustBeOpen, viewWalletsBanned))
+            .Post("/transactions/send/advanced", router(&ApiDispatcher::sendAdvancedTransaction, walletMustBeOpen, viewWalletsBanned))
 
             /* Send a fusion transaction */
-            .Post("/transactions/send/fusion/basic", router(&ApiDispatcher::sendBasicFusionTransaction, WalletMustBeOpen, viewWalletsBanned))
+            .Post("/transactions/send/fusion/basic", router(&ApiDispatcher::sendBasicFusionTransaction, walletMustBeOpen, viewWalletsBanned))
 
             /* Send a fusion transaction, more parameters specified */
-            .Post("/transactions/send/fusion/advanced", router(&ApiDispatcher::sendAdvancedFusionTransaction, WalletMustBeOpen, viewWalletsBanned))
+            .Post("/transactions/send/fusion/advanced", router(&ApiDispatcher::sendAdvancedFusionTransaction, walletMustBeOpen, viewWalletsBanned))
 
     /* DELETE */
 
             /* Close the current wallet */
-            .Delete("/wallet", router(&ApiDispatcher::closeWallet, WalletMustBeOpen, viewWalletsAllowed))
+            .Delete("/wallet", router(&ApiDispatcher::closeWallet, walletMustBeOpen, viewWalletsAllowed))
 
             /* Delete the given address */
-            .Delete("/addresses/" + ApiConstants::addressRegex, router(&ApiDispatcher::deleteAddress, WalletMustBeOpen, viewWalletsAllowed))
+            .Delete("/addresses/" + ApiConstants::addressRegex, router(&ApiDispatcher::deleteAddress, walletMustBeOpen, viewWalletsAllowed))
 
     /* PUT */
 
             /* Save the wallet */
-            .Put("/save", router(&ApiDispatcher::saveWallet, WalletMustBeOpen, viewWalletsAllowed))
+            .Put("/save", router(&ApiDispatcher::saveWallet, walletMustBeOpen, viewWalletsAllowed))
 
             /* Reset the wallet from zero, or given scan height */
-            .Put("/reset", router(&ApiDispatcher::resetWallet, WalletMustBeOpen, viewWalletsAllowed))
+            .Put("/reset", router(&ApiDispatcher::resetWallet, walletMustBeOpen, viewWalletsAllowed))
 
             /* Swap node details */
-            .Put("/node", router(&ApiDispatcher::setNodeInfo, WalletMustBeOpen, viewWalletsAllowed))
+            .Put("/node", router(&ApiDispatcher::setNodeInfo, walletMustBeOpen, viewWalletsAllowed))
 
     /* GET */
 
             /* Get node details */
-            .Get("/node", router(&ApiDispatcher::getNodeInfo, WalletMustBeOpen, viewWalletsAllowed))
+            .Get("/node", router(&ApiDispatcher::getNodeInfo, walletMustBeOpen, viewWalletsAllowed))
 
             /* Get the shared private view key */
-            .Get("/keys", router(&ApiDispatcher::getPrivateViewKey, WalletMustBeOpen, viewWalletsAllowed))
+            .Get("/keys", router(&ApiDispatcher::getPrivateViewKey, walletMustBeOpen, viewWalletsAllowed))
 
             /* Get the spend keys for the given address */
-            .Get("/keys/" + ApiConstants::addressRegex, router(&ApiDispatcher::getSpendKeys, WalletMustBeOpen, viewWalletsBanned))
+            .Get("/keys/" + ApiConstants::addressRegex, router(&ApiDispatcher::getSpendKeys, walletMustBeOpen, viewWalletsBanned))
 
             /* Get the mnemonic seed for the given address */
-            .Get("/keys/mnemonic/" + ApiConstants::addressRegex, router(&ApiDispatcher::getMnemonicSeed, WalletMustBeOpen, viewWalletsBanned))
+            .Get("/keys/mnemonic/" + ApiConstants::addressRegex, router(&ApiDispatcher::getMnemonicSeed, walletMustBeOpen, viewWalletsBanned))
 
             /* Get the wallet status */
-            .Get("/status", router(&ApiDispatcher::getStatus, WalletMustBeOpen, viewWalletsAllowed))
+            .Get("/status", router(&ApiDispatcher::getStatus, walletMustBeOpen, viewWalletsAllowed))
 
             /* Get a list of all addresses */
-            .Get("/addresses", router(&ApiDispatcher::getAddresses, WalletMustBeOpen, viewWalletsAllowed))
+            .Get("/addresses", router(&ApiDispatcher::getAddresses, walletMustBeOpen, viewWalletsAllowed))
 
             /* Get the primary address */
-            .Get("/addresses/primary", router(&ApiDispatcher::getPrimaryAddress, WalletMustBeOpen, viewWalletsAllowed))
+            .Get("/addresses/primary", router(&ApiDispatcher::getPrimaryAddress, walletMustBeOpen, viewWalletsAllowed))
 
             /* Creates an integrated address from the given address and payment ID */
             .Get("/addresses/" + ApiConstants::addressRegex + "/" + ApiConstants::hashRegex, router(
-                &ApiDispatcher::createIntegratedAddress, WalletMustBeOpen, viewWalletsAllowed)
+                &ApiDispatcher::createIntegratedAddress, walletMustBeOpen, viewWalletsAllowed)
             )
 
             /* Get all transactions */
-            .Get("/transactions", router(&ApiDispatcher::getTransactions, WalletMustBeOpen, viewWalletsAllowed))
+            .Get("/transactions", router(&ApiDispatcher::getTransactions, walletMustBeOpen, viewWalletsAllowed))
 
             /* Get all (outgoing) unconfirmed transactions */
-            .Get("/transactions/unconfirmed", router(&ApiDispatcher::getUnconfirmedTransactions, WalletMustBeOpen, viewWalletsAllowed))
+            .Get("/transactions/unconfirmed", router(&ApiDispatcher::getUnconfirmedTransactions, walletMustBeOpen, viewWalletsAllowed))
 
             /* Get all (outgoing) unconfirmed transactions, belonging to the given address */
             .Get("/transactions/unconfirmed/" + ApiConstants::addressRegex, router(
-                &ApiDispatcher::getUnconfirmedTransactionsForAddress, WalletMustBeOpen, viewWalletsAllowed)
+                &ApiDispatcher::getUnconfirmedTransactionsForAddress, walletMustBeOpen, viewWalletsAllowed)
             )
 
             /* Get the transactions starting at the given block, for 1000 blocks */
-            .Get("/transactions/\\d+", router(&ApiDispatcher::getTransactionsFromHeight, WalletMustBeOpen, viewWalletsAllowed))
+            .Get("/transactions/\\d+", router(&ApiDispatcher::getTransactionsFromHeight, walletMustBeOpen, viewWalletsAllowed))
 
             /* Get the transactions starting at the given block, and ending at the given block */
-            .Get("/transactions/\\d+/\\d+", router(&ApiDispatcher::getTransactionsFromHeightToHeight, WalletMustBeOpen, viewWalletsAllowed))
+            .Get("/transactions/\\d+/\\d+", router(&ApiDispatcher::getTransactionsFromHeightToHeight, walletMustBeOpen, viewWalletsAllowed))
 
             /* Get the transactions starting at the given block, for 1000 blocks, belonging to the given address */
             .Get("/transactions/address/" + ApiConstants::addressRegex + "/\\d+", router(
-                &ApiDispatcher::getTransactionsFromHeightWithAddress, WalletMustBeOpen, viewWalletsAllowed)
+                &ApiDispatcher::getTransactionsFromHeightWithAddress, walletMustBeOpen, viewWalletsAllowed)
             )
 
             /* Get the transactions starting at the given block, and ending at the given block, belonging to the given address */
             .Get("/transactions/address/" + ApiConstants::addressRegex + "/\\d+/\\d+", router(
-                &ApiDispatcher::getTransactionsFromHeightToHeightWithAddress, WalletMustBeOpen, viewWalletsAllowed)
+                &ApiDispatcher::getTransactionsFromHeightToHeightWithAddress, walletMustBeOpen, viewWalletsAllowed)
             )
 
             /* Get the transaction private key for the given hash */
             .Get("/transactions/privatekey/" + ApiConstants::hashRegex, router(
-                &ApiDispatcher::getTxPrivateKey, WalletMustBeOpen, viewWalletsBanned)
+                &ApiDispatcher::getTxPrivateKey, walletMustBeOpen, viewWalletsBanned)
             )
 
             /* Get details for the given transaction hash, if known */
-            .Get("/transactions/hash/" + ApiConstants::hashRegex, router(&ApiDispatcher::getTransactionDetails, WalletMustBeOpen, viewWalletsAllowed))
+            .Get("/transactions/hash/" + ApiConstants::hashRegex, router(&ApiDispatcher::getTransactionDetails, walletMustBeOpen, viewWalletsAllowed))
 
             /* Get balance for the wallet */
-            .Get("/balance", router(&ApiDispatcher::getBalance, WalletMustBeOpen, viewWalletsAllowed))
+            .Get("/balance", router(&ApiDispatcher::getBalance, walletMustBeOpen, viewWalletsAllowed))
 
             /* Get balance for a specific address */
-            .Get("/balance/" + ApiConstants::addressRegex, router(&ApiDispatcher::getBalanceForAddress, WalletMustBeOpen, viewWalletsAllowed))
+            .Get("/balance/" + ApiConstants::addressRegex, router(&ApiDispatcher::getBalanceForAddress, walletMustBeOpen, viewWalletsAllowed))
 
             /* Get balances for each address */
-            .Get("/balances", router(&ApiDispatcher::getBalances, WalletMustBeOpen, viewWalletsAllowed))
+            .Get("/balances", router(&ApiDispatcher::getBalances, walletMustBeOpen, viewWalletsAllowed))
 
     /* OPTIONS */
 
@@ -219,7 +212,7 @@ void ApiDispatcher::start()
 {
     if (!m_server.listen(m_host, m_port))
     {
-      std::cout << "Could not bind service to " << m_host << ":" << m_port
+      std::cout << "Could not bind service to " << m_host << ":" << m_port 
                 << "\nIs another service using this address and port?\n";
       exit(1);
     }
@@ -233,7 +226,7 @@ void ApiDispatcher::stop()
 void ApiDispatcher::middleware(
     const Request &req,
     Response &res,
-    const WalletState walletState,
+    const bool walletMustBeOpen,
     const bool viewWalletPermitted,
     std::function<std::tuple<Error, uint16_t>
         (const Request &req,
@@ -274,13 +267,13 @@ void ApiDispatcher::middleware(
     }
 
     /* Wallet must be open for this operation, and it is not */
-    if (walletState == WalletMustBeOpen && !assertWalletOpen())
+    if (walletMustBeOpen && !assertWalletOpen())
     {
         res.status = 403;
         return;
     }
     /* Wallet must not be open for this operation, and it is */
-    else if (walletState == WalletMustBeClosed && !assertWalletClosed())
+    else if (!walletMustBeOpen && !assertWalletClosed())
     {
         res.status = 403;
         return;
@@ -381,12 +374,12 @@ std::tuple<Error, uint16_t> ApiDispatcher::openWallet(
 {
     std::scoped_lock lock(m_mutex);
 
-    const auto [daemonHost, daemonPort, daemonSSL, filename, password] = getDefaultWalletParams(body);
+    const auto [daemonHost, daemonPort, filename, password] = getDefaultWalletParams(body);
 
     Error error;
 
     std::tie(error, m_walletBackend) = WalletBackend::openWallet(
-        filename, password, daemonHost, daemonPort, daemonSSL, m_walletSyncThreads
+        filename, password, daemonHost, daemonPort
     );
 
     return {error, 200};
@@ -399,23 +392,23 @@ std::tuple<Error, uint16_t> ApiDispatcher::keyImportWallet(
 {
     std::scoped_lock lock(m_mutex);
 
-    const auto [daemonHost, daemonPort, daemonSSL, filename, password] = getDefaultWalletParams(body);
+    const auto [daemonHost, daemonPort, filename, password] = getDefaultWalletParams(body);
 
-    const auto privateViewKey = getJsonValue<Crypto::SecretKey>(body, "privateViewKey");
-    const auto privateSpendKey = getJsonValue<Crypto::SecretKey>(body, "privateSpendKey");
+    const auto privateViewKey = tryGetJsonValue<Crypto::SecretKey>(body, "privateViewKey");
+    const auto privateSpendKey = tryGetJsonValue<Crypto::SecretKey>(body, "privateSpendKey");
 
     uint64_t scanHeight = 0;
 
     if (body.find("scanHeight") != body.end())
     {
-        scanHeight = getJsonValue<uint64_t>(body, "scanHeight");
+        scanHeight = tryGetJsonValue<uint64_t>(body, "scanHeight");
     }
 
     Error error;
 
     std::tie(error, m_walletBackend) = WalletBackend::importWalletFromKeys(
         privateSpendKey, privateViewKey, filename, password, scanHeight,
-        daemonHost, daemonPort, daemonSSL, m_walletSyncThreads
+        daemonHost, daemonPort
     );
 
     return {error, 200};
@@ -428,22 +421,21 @@ std::tuple<Error, uint16_t> ApiDispatcher::seedImportWallet(
 {
     std::scoped_lock lock(m_mutex);
 
-    const auto [daemonHost, daemonPort, daemonSSL, filename, password] = getDefaultWalletParams(body);
+    const auto [daemonHost, daemonPort, filename, password] = getDefaultWalletParams(body);
 
-    const std::string mnemonicSeed = getJsonValue<std::string>(body, "mnemonicSeed");
+    const std::string mnemonicSeed = tryGetJsonValue<std::string>(body, "mnemonicSeed");
 
     uint64_t scanHeight = 0;
 
     if (body.find("scanHeight") != body.end())
     {
-        scanHeight = getJsonValue<uint64_t>(body, "scanHeight");
+        scanHeight = tryGetJsonValue<uint64_t>(body, "scanHeight");
     }
 
     Error error;
 
     std::tie(error, m_walletBackend) = WalletBackend::importWalletFromSeed(
-        mnemonicSeed, filename, password, scanHeight, daemonHost, daemonPort,
-        daemonSSL, m_walletSyncThreads
+        mnemonicSeed, filename, password, scanHeight, daemonHost, daemonPort
     );
 
     return {error, 200};
@@ -456,25 +448,25 @@ std::tuple<Error, uint16_t> ApiDispatcher::importViewWallet(
 {
     std::scoped_lock lock(m_mutex);
 
-    const auto [daemonHost, daemonPort, daemonSSL, filename, password] = getDefaultWalletParams(body);
+    const auto [daemonHost, daemonPort, filename, password] = getDefaultWalletParams(body);
 
-    const std::string address = getJsonValue<std::string>(body, "address");
-    const auto privateViewKey = getJsonValue<Crypto::SecretKey>(body, "privateViewKey");
+    const std::string address = tryGetJsonValue<std::string>(body, "address");
+    const auto privateViewKey = tryGetJsonValue<Crypto::SecretKey>(body, "privateViewKey");
 
     uint64_t scanHeight = 0;
 
     if (body.find("scanHeight") != body.end())
     {
-        scanHeight = getJsonValue<uint64_t>(body, "scanHeight");
+        scanHeight = tryGetJsonValue<uint64_t>(body, "scanHeight");
     }
 
     Error error;
 
     std::tie(error, m_walletBackend) = WalletBackend::importViewWallet(
         privateViewKey, address, filename, password, scanHeight,
-        daemonHost, daemonPort, daemonSSL, m_walletSyncThreads
+        daemonHost, daemonPort
     );
-
+    
     return {error, 200};
 }
 
@@ -485,12 +477,12 @@ std::tuple<Error, uint16_t> ApiDispatcher::createWallet(
 {
     std::scoped_lock lock(m_mutex);
 
-    const auto [daemonHost, daemonPort, daemonSSL, filename, password] = getDefaultWalletParams(body);
+    const auto [daemonHost, daemonPort, filename, password] = getDefaultWalletParams(body);
 
     Error error;
 
     std::tie(error, m_walletBackend) = WalletBackend::createWallet(
-        filename, password, daemonHost, daemonPort, daemonSSL, m_walletSyncThreads
+        filename, password, daemonHost, daemonPort
     );
 
     return {error, 200};
@@ -503,12 +495,9 @@ std::tuple<Error, uint16_t> ApiDispatcher::createAddress(
 {
     const auto [error, address, privateSpendKey] = m_walletBackend->addSubWallet();
 
-    const auto [publicSpendKey, publicViewKey] = Utilities::addressToKeys(address);
-
     nlohmann::json j {
         {"address", address},
-        {"privateSpendKey", privateSpendKey},
-        {"publicSpendKey", publicSpendKey}
+        {"privateSpendKey", privateSpendKey}
     };
 
     res.set_content(j.dump(4) + "\n", "application/json");
@@ -527,10 +516,10 @@ std::tuple<Error, uint16_t> ApiDispatcher::importAddress(
        begin again from zero if none is given */
     if (body.find("scanHeight") != body.end())
     {
-        scanHeight = getJsonValue<uint64_t>(body, "scanHeight");
+        scanHeight = tryGetJsonValue<uint64_t>(body, "scanHeight");
     }
 
-    const auto privateSpendKey = getJsonValue<Crypto::SecretKey>(body, "privateSpendKey");
+    const auto privateSpendKey = tryGetJsonValue<Crypto::SecretKey>(body, "privateSpendKey");
 
     const auto [error, address] = m_walletBackend->importSubWallet(
         privateSpendKey, scanHeight
@@ -561,10 +550,10 @@ std::tuple<Error, uint16_t> ApiDispatcher::importViewAddress(
        begin again from zero if none is given */
     if (body.find("scanHeight") != body.end())
     {
-        scanHeight = getJsonValue<uint64_t>(body, "scanHeight");
+        scanHeight = tryGetJsonValue<uint64_t>(body, "scanHeight");
     }
 
-    const auto publicSpendKey = getJsonValue<Crypto::PublicKey>(body, "publicSpendKey");
+    const auto publicSpendKey = tryGetJsonValue<Crypto::PublicKey>(body, "publicSpendKey");
 
     const auto [error, address] = m_walletBackend->importViewSubWallet(
         publicSpendKey, scanHeight
@@ -584,59 +573,20 @@ std::tuple<Error, uint16_t> ApiDispatcher::importViewAddress(
     return {SUCCESS, 201};
 }
 
-std::tuple<Error, uint16_t> ApiDispatcher::validateAddress(
-    const Request &req,
-    Response &res,
-    const nlohmann::json &body)
-{
-    const std::string address = getJsonValue<std::string>(body, "address");
-
-    const Error error = validateAddresses({address}, true);
-
-    if (error != SUCCESS) {
-        return {error, 400};
-    }
-
-    std::string actualAddress = address;
-    std::string paymentID = "";
-
-    const bool isIntegrated = address.length() == WalletConfig::integratedAddressLength;
-
-    if (isIntegrated)
-    {
-        std::tie(actualAddress, paymentID) = Utilities::extractIntegratedAddressData(address);
-    }
-
-    const auto [publicSpendKey, publicViewKey] = Utilities::addressToKeys(actualAddress);
-
-    nlohmann::json j {
-        {"isIntegrated", address.length() == WalletConfig::integratedAddressLength},
-        {"paymentID", paymentID},
-        {"actualAddress", actualAddress},
-        {"publicSpendKey", publicSpendKey},
-        {"publicViewKey", publicViewKey},
-    };
-
-    res.set_content(j.dump(4) + "\n", "application/json");
-
-    return {SUCCESS, 200};
-}
-
-
 std::tuple<Error, uint16_t> ApiDispatcher::sendBasicTransaction(
     const Request &req,
     Response &res,
     const nlohmann::json &body)
 {
-    const std::string address = getJsonValue<std::string>(body, "destination");
+    const std::string address = tryGetJsonValue<std::string>(body, "destination");
 
-    const uint64_t amount = getJsonValue<uint64_t>(body, "amount");
+    const uint64_t amount = tryGetJsonValue<uint64_t>(body, "amount");
 
     std::string paymentID;
 
     if (body.find("paymentID") != body.end())
     {
-        paymentID = getJsonValue<std::string>(body, "paymentID");
+        paymentID = tryGetJsonValue<std::string>(body, "paymentID");
     }
 
     auto [error, hash] = m_walletBackend->sendTransactionBasic(
@@ -662,14 +612,14 @@ std::tuple<Error, uint16_t> ApiDispatcher::sendAdvancedTransaction(
     Response &res,
     const nlohmann::json &body)
 {
-    const json destinationsJSON = getJsonValue<json>(body, "destinations");
+    const json destinationsJSON = tryGetJsonValue<json>(body, "destinations");
 
     std::vector<std::pair<std::string, uint64_t>> destinations;
 
     for (const auto destination : destinationsJSON)
     {
-        const std::string address = getJsonValue<std::string>(destination, "address");
-        const uint64_t amount = getJsonValue<uint64_t>(destination, "amount");
+        const std::string address = tryGetJsonValue<std::string>(destination, "address");
+        const uint64_t amount = tryGetJsonValue<uint64_t>(destination, "amount");
         destinations.emplace_back(address, amount);
     }
 
@@ -677,12 +627,12 @@ std::tuple<Error, uint16_t> ApiDispatcher::sendAdvancedTransaction(
 
     if (body.find("mixin") != body.end())
     {
-        mixin = getJsonValue<uint64_t>(body, "mixin");
+        mixin = tryGetJsonValue<uint64_t>(body, "mixin");
     }
     else
     {
         /* Get the default mixin */
-        std::tie(std::ignore, std::ignore, mixin) = Utilities::getMixinAllowableRange(
+        std::tie(std::ignore, std::ignore, mixin) = CryptoNote::Mixins::getMixinAllowableRange(
             m_walletBackend->getStatus().networkBlockCount
         );
     }
@@ -691,35 +641,35 @@ std::tuple<Error, uint16_t> ApiDispatcher::sendAdvancedTransaction(
 
     if (body.find("fee") != body.end())
     {
-        fee = getJsonValue<uint64_t>(body, "fee");
+        fee = tryGetJsonValue<uint64_t>(body, "fee");
     }
 
     std::vector<std::string> subWalletsToTakeFrom = {};
 
     if (body.find("sourceAddresses") != body.end())
     {
-        subWalletsToTakeFrom = getJsonValue<std::vector<std::string>>(body, "sourceAddresses");
+        subWalletsToTakeFrom = tryGetJsonValue<std::vector<std::string>>(body, "sourceAddresses");
     }
 
     std::string paymentID;
 
     if (body.find("paymentID") != body.end())
     {
-        paymentID = getJsonValue<std::string>(body, "paymentID");
+        paymentID = tryGetJsonValue<std::string>(body, "paymentID");
     }
 
     std::string changeAddress;
 
     if (body.find("changeAddress") != body.end())
     {
-        changeAddress = getJsonValue<std::string>(body, "changeAddress");
+        changeAddress = tryGetJsonValue<std::string>(body, "changeAddress");
     }
 
     uint64_t unlockTime = 0;
 
     if (body.find("unlockTime") != body.end())
     {
-        unlockTime = getJsonValue<uint64_t>(body, "unlockTime");
+        unlockTime = tryGetJsonValue<uint64_t>(body, "unlockTime");
     }
 
     auto [error, hash] = m_walletBackend->sendTransactionAdvanced(
@@ -767,18 +717,18 @@ std::tuple<Error, uint16_t> ApiDispatcher::sendAdvancedFusionTransaction(
     Response &res,
     const nlohmann::json &body)
 {
-    const std::string destination = getJsonValue<std::string>(body, "destination");
+    const std::string destination = tryGetJsonValue<std::string>(body, "destination");
 
     uint64_t mixin;
 
     if (body.find("mixin") != body.end())
     {
-        mixin = getJsonValue<uint64_t>(body, "mixin");
+        mixin = tryGetJsonValue<uint64_t>(body, "mixin");
     }
     else
     {
         /* Get the default mixin */
-        std::tie(std::ignore, std::ignore, mixin) = Utilities::getMixinAllowableRange(
+        std::tie(std::ignore, std::ignore, mixin) = CryptoNote::Mixins::getMixinAllowableRange(
             m_walletBackend->getStatus().networkBlockCount
         );
     }
@@ -787,7 +737,7 @@ std::tuple<Error, uint16_t> ApiDispatcher::sendAdvancedFusionTransaction(
 
     if (body.find("sourceAddresses") != body.end())
     {
-        subWalletsToTakeFrom = getJsonValue<std::vector<std::string>>(body, "sourceAddresses");
+        subWalletsToTakeFrom = tryGetJsonValue<std::vector<std::string>>(body, "sourceAddresses");
     }
 
     auto [error, hash] = m_walletBackend->sendFusionTransactionAdvanced(
@@ -875,7 +825,7 @@ std::tuple<Error, uint16_t> ApiDispatcher::resetWallet(
 
     if (body.find("scanHeight") != body.end())
     {
-        scanHeight = getJsonValue<uint64_t>(body, "scanHeight");
+        scanHeight = tryGetJsonValue<uint64_t>(body, "scanHeight");
     }
 
     m_walletBackend->reset(scanHeight, timestamp);
@@ -890,24 +840,10 @@ std::tuple<Error, uint16_t> ApiDispatcher::setNodeInfo(
 {
     std::scoped_lock lock(m_mutex);
 
-    uint16_t daemonPort = CryptoNote::RPC_DEFAULT_PORT;
-    bool daemonSSL = false;
+    const std::string daemonHost = tryGetJsonValue<std::string>(body, "daemonHost");
+    const uint16_t daemonPort = tryGetJsonValue<uint16_t>(body, "daemonPort");
 
-    /* This parameter is required */
-    const std::string daemonHost = getJsonValue<std::string>(body, "daemonHost");
-
-    /* These parameters are optional */
-    if (body.find("daemonPort") != body.end())
-    {
-        daemonPort = getJsonValue<uint16_t>(body, "daemonPort");
-    }
-
-    if (body.find("daemonSSL") != body.end())
-    {
-        daemonSSL = getJsonValue<bool>(body, "daemonSSL");
-    }
-
-    m_walletBackend->swapNode(daemonHost, daemonPort, daemonSSL);
+    m_walletBackend->swapNode(daemonHost, daemonPort);
 
     return {SUCCESS, 202};
 }
@@ -921,14 +857,13 @@ std::tuple<Error, uint16_t> ApiDispatcher::getNodeInfo(
     Response &res,
     const nlohmann::json &body) const
 {
-    const auto [daemonHost, daemonPort, daemonSSL] = m_walletBackend->getNodeAddress();
+    const auto [daemonHost, daemonPort] = m_walletBackend->getNodeAddress();
 
     const auto [nodeFee, nodeAddress] = m_walletBackend->getNodeFee();
 
     nlohmann::json j {
         {"daemonHost", daemonHost},
         {"daemonPort", daemonPort},
-        {"daemonSSL", daemonSSL},
         {"nodeFee", nodeFee},
         {"nodeAddress", nodeAddress}
     };
@@ -1077,7 +1012,7 @@ std::tuple<Error, uint16_t> ApiDispatcher::createIntegratedAddress(
     /* Skip the address */
     std::string paymentID = stripped.substr(splitPos + 1);
 
-    const auto [error, integratedAddress] = Utilities::createIntegratedAddress(address, paymentID);
+    const auto [error, integratedAddress] = WalletBackend::createIntegratedAddress(address, paymentID);
 
     if (error)
     {
@@ -1200,7 +1135,7 @@ std::tuple<Error, uint16_t> ApiDispatcher::getTransactionsFromHeight(
         return {SUCCESS, 400};
     }
 }
-
+            
 std::tuple<Error, uint16_t> ApiDispatcher::getTransactionsFromHeightToHeight(
     const httplib::Request &req,
     httplib::Response &res,
@@ -1548,7 +1483,7 @@ void ApiDispatcher::handleOptions(
     }
     else
     {
-        res.set_header("Allow", supported);
+        res.set_header("Allow", supported); 
     }
 
     /* Add the cors header if not empty string */
@@ -1562,32 +1497,26 @@ void ApiDispatcher::handleOptions(
     res.status = 200;
 }
 
-std::tuple<std::string, uint16_t, bool, std::string, std::string>
+std::tuple<std::string, uint16_t, std::string, std::string>
     ApiDispatcher::getDefaultWalletParams(const nlohmann::json body) const
 {
     std::string daemonHost = "127.0.0.1";
     uint16_t daemonPort = CryptoNote::RPC_DEFAULT_PORT;
-    bool daemonSSL = false;
 
-    const std::string filename = getJsonValue<std::string>(body, "filename");
-    const std::string password = getJsonValue<std::string>(body, "password");
+    const std::string filename = tryGetJsonValue<std::string>(body, "filename"); 
+    const std::string password = tryGetJsonValue<std::string>(body, "password");
 
     if (body.find("daemonHost") != body.end())
     {
-        daemonHost = getJsonValue<std::string>(body, "daemonHost");
+        daemonHost = tryGetJsonValue<std::string>(body, "daemonHost");
     }
 
     if (body.find("daemonPort") != body.end())
     {
-        daemonPort = getJsonValue<uint16_t>(body, "daemonPort");
+        daemonPort = tryGetJsonValue<uint16_t>(body, "daemonPort");
     }
 
-    if (body.find("daemonSSL") != body.end())
-    {
-        daemonSSL = getJsonValue<bool>(body, "daemonSSL");
-    }
-
-    return {daemonHost, daemonPort, daemonSSL, filename, password};
+    return {daemonHost, daemonPort, filename, password};
 }
 
 //////////////////////////

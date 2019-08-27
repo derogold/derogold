@@ -61,8 +61,6 @@ public:
   virtual void lastKnownBlockHeightUpdated(uint32_t height) override;
   virtual void poolChanged() override;
 
-  std::vector<Crypto::Hash> getLastKnownBlockHashes() const;
-
 private:
 
   struct GetBlocksResponse {

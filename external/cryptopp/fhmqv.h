@@ -135,7 +135,6 @@ public:
 
     try
     {
-      this->GetMaterial().DoQuickSanityCheck();
       const DL_GroupParameters<Element> &params = GetAbstractGroupParameters();
 
       if(m_role == RoleServer)

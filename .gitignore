@@ -1,15 +1,12 @@
 .DS_Store
 .build/
 build/
-build64/
 /tags
 .idea
 .ycm_extra_conf.py
 .ycm_extra_conf.pyc
 build/src/Release
 build/src/Debug
-build64/src/Release
-build64/src/Debug
 src/CMakeCache.txt
 src/CMakeFiles/
 src/Makefile

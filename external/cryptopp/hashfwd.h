@@ -20,9 +20,6 @@ class SHA3_256;
 class SHA3_384;
 class SHA3_512;
 
-class SHAKE128;
-class SHAKE256;
-
 class Tiger;
 class RIPEMD128;
 class RIPEMD160;

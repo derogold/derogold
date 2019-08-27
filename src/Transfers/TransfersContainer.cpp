@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with Bytecoin.  If not, see <http://www.gnu.org/licenses/>.
 
-#include "WalletGreenTypes.h"
+#include "IWallet.h"
 #include "TransfersContainer.h"
 #include "Common/StdInputStream.h"
 #include "Common/StdOutputStream.h"
@@ -24,8 +24,6 @@
 #include "Serialization/BinaryInputStreamSerializer.h"
 #include "Serialization/BinaryOutputStreamSerializer.h"
 #include "Serialization/SerializationOverloads.h"
-
-#include <config/Constants.h>
 
 using namespace Common;
 using namespace Crypto;
@@ -212,7 +210,7 @@ void TransfersContainer::addTransaction(const TransactionBlockInfo& block, const
   txInfo.extra = tx.getExtra();
 
   if (!tx.getPaymentId(txInfo.paymentId)) {
-    txInfo.paymentId = Constants::NULL_HASH;
+    txInfo.paymentId = NULL_HASH;
   }
 
   auto result = m_transactions.insert(std::move(txInfo));
@@ -684,35 +682,6 @@ uint64_t TransfersContainer::balance(uint32_t flags) const {
   }
 
   return amount;
-}
-
-std::vector<SpentTransactionOutput> TransfersContainer::getUnspentInputs() const
-{
-    std::vector<SpentTransactionOutput> result;
-
-    for (const auto &input : m_availableTransfers)
-    {
-        if (input.blockHeight != WALLET_UNCONFIRMED_TRANSACTION_HEIGHT)
-        {
-            /* "cast" TransactionOutputInformationEx to SpentTransactionOutput,
-               leaving other members default constructed */
-            result.push_back({input});
-        }
-    }
-
-    return result;
-}
-
-std::vector<SpentTransactionOutput> TransfersContainer::getSpentInputs() const
-{
-    std::vector<SpentTransactionOutput> result;
-
-    for (const auto &input : m_spentTransfers)
-    {
-        result.push_back(input);
-    }
-
-    return result;
 }
 
 void TransfersContainer::getOutputs(std::vector<TransactionOutputInformation>& transfers, uint32_t flags) const {

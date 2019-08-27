@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, The TurtleCoin Developers
+// Copyright (c) 2018, The TurtleCoin Developers
 // 
 // Please see the included LICENSE file for more information.
 
@@ -14,7 +14,7 @@
 #include <zedwallet++/Commands.h>
 #include <zedwallet++/GetInput.h>
 
-std::tuple<bool, bool, std::shared_ptr<WalletBackend>> selectionScreen(const ZedConfig &config)
+std::tuple<bool, bool, std::shared_ptr<WalletBackend>> selectionScreen(const Config &config)
 {
     while (true)
     {
@@ -148,11 +148,11 @@ bool checkNodeStatus(const std::shared_ptr<WalletBackend> walletBackend)
         /* User wants to try a different node */
         else if (command == "swap_node")
         {
-            const auto [host, port, ssl] = getDaemonAddress();
+            const auto [host, port] = getDaemonAddress();
 
             std::cout << InformationMsg("\nSwapping node, this may take some time...\n");
 
-            walletBackend->swapNode(host, port, ssl);
+            walletBackend->swapNode(host, port);
 
             std::cout << SuccessMsg("Node swap complete.\n\n");
 
@@ -163,7 +163,7 @@ bool checkNodeStatus(const std::shared_ptr<WalletBackend> walletBackend)
     return true;
 }
 
-std::string getAction(const ZedConfig &config)
+std::string getAction(const Config &config)
 {
     if (config.walletGiven || config.passGiven)
     {

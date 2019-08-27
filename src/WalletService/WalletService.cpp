@@ -4,52 +4,43 @@
 //
 // Please see the included LICENSE file for more information.
 
-////////////////////////////////////////
-#include <WalletService/WalletService.h>
-////////////////////////////////////////
+#include "WalletService.h"
 
+
+#include <future>
 #include <assert.h>
+#include <sstream>
+#include <unordered_set>
+#include <tuple>
 
 #include <boost/filesystem/operations.hpp>
 
+#include <System/Timer.h>
+#include <System/InterruptedException.h>
 #include "Common/Base58.h"
-#include "Common/CryptoNoteTools.h"
-#include "Common/TransactionExtra.h"
 #include "Common/Util.h"
 
 #include "crypto/crypto.h"
-
 #include "CryptoNote.h"
-
-#include "CryptoNoteCore/Account.h"
-#include "CryptoNoteCore/CryptoNoteBasicImpl.h"
 #include "CryptoNoteCore/CryptoNoteFormatUtils.h"
+#include "CryptoNoteCore/CryptoNoteBasicImpl.h"
+#include "CryptoNoteCore/CryptoNoteTools.h"
+#include "CryptoNoteCore/TransactionExtra.h"
+#include "CryptoNoteCore/Account.h"
 #include "CryptoNoteCore/Mixins.h"
 
-#include <future>
-
-#include <Mnemonics/Mnemonics.h>
-
-#include <sstream>
-
 #include <System/EventLock.h>
-#include <System/InterruptedException.h>
 #include <System/RemoteContext.h>
-#include <System/Timer.h>
 
-#include <tuple>
+#include "PaymentServiceJsonRpcMessages.h"
+#include "NodeFactory.h"
 
-#include <unordered_set>
+#include "Wallet/WalletGreen.h"
+#include "Wallet/WalletErrors.h"
+#include "Wallet/WalletUtils.h"
+#include "WalletServiceErrorCategory.h"
 
-#include <Utilities/Addresses.h>
-
-#include <WalletService/NodeFactory.h>
-#include <WalletService/PaymentServiceJsonRpcMessages.h>
-#include <WalletService/WalletServiceErrorCategory.h>
-
-#include <Wallet/WalletGreen.h>
-#include <Wallet/WalletErrors.h>
-#include <Wallet/WalletUtils.h>
+#include "Mnemonics/Mnemonics.h"
 
 namespace PaymentService {
 
@@ -106,28 +97,6 @@ std::string getPaymentIdStringFromExtra(const std::string& binaryString) {
   }
 
   return Common::podToHex(paymentId);
-}
-
-std::tuple<bool, std::string, std::error_code> validateMixin(
-    const uint64_t mixin,
-    const uint64_t height)
-{
-    auto [minMixin, maxMixin, defaultMixin] = Utilities::getMixinAllowableRange(height);
-
-    std::stringstream str;
-
-    if (mixin < minMixin)
-    {
-        str << "Mixin of " << mixin << " under minimum mixin threshold of " << minMixin;
-        return {false, str.str(), make_error_code(CryptoNote::error::MIXIN_BELOW_THRESHOLD)};
-    }
-    else if (mixin > maxMixin)
-    {
-        str << "Mixin of " << mixin << " above maximum mixin threshold of " << maxMixin;
-        return {false, str.str(), make_error_code(CryptoNote::error::MIXIN_ABOVE_THRESHOLD)};
-    }
-
-    return {true, std::string(), std::error_code()};
 }
 
 }
@@ -344,7 +313,7 @@ std::tuple<std::string, std::string> decodeIntegratedAddress(const std::string& 
     
     /* Parse the AccountPublicAddress into a standard wallet address */
     /* Use the calculated prefix from earlier for less typing :p */
-    std::string address = Utilities::getAccountAddressAsStr(prefix, addr);
+    std::string address = CryptoNote::getAccountAddressAsStr(prefix, addr);
     
     /* Check the extracted address is good. */
     validateAddresses({address}, currency, logger);
@@ -397,8 +366,8 @@ void generateNewWallet(const CryptoNote::Currency& currency, const WalletConfigu
   CryptoNote::INode* nodeStub = NodeFactory::createNodeStub();
   std::unique_ptr<CryptoNote::INode> nodeGuard(nodeStub);
 
-  CryptoNote::WalletGreen* wallet = new CryptoNote::WalletGreen(dispatcher, currency, *nodeStub, logger);
-  std::unique_ptr<CryptoNote::WalletGreen> walletGuard(wallet);
+  CryptoNote::IWallet* wallet = new CryptoNote::WalletGreen(dispatcher, currency, *nodeStub, logger);
+  std::unique_ptr<CryptoNote::IWallet> walletGuard(wallet);
 
   std::string address;
   if (conf.secretSpendKey.empty() && conf.secretViewKey.empty() && conf.mnemonicSeed.empty())
@@ -409,7 +378,7 @@ void generateNewWallet(const CryptoNote::Currency& currency, const WalletConfigu
     CryptoNote::KeyPair spendKey;
 
     Crypto::generate_keys(spendKey.publicKey, spendKey.secretKey);
-    Crypto::crypto_ops::generateViewFromSpend(spendKey.secretKey, private_view_key);
+    CryptoNote::AccountBase::generateViewFromSpend(spendKey.secretKey, private_view_key);
 
     wallet->initializeWithViewKey(conf.walletFile, conf.walletPassword, private_view_key, 0, true);
     address = wallet->createAddress(spendKey.secretKey, 0, true);
@@ -430,7 +399,7 @@ void generateNewWallet(const CryptoNote::Currency& currency, const WalletConfigu
 
     Crypto::SecretKey private_view_key;
 
-    Crypto::crypto_ops::generateViewFromSpend(private_spend_key, private_view_key);
+    CryptoNote::AccountBase::generateViewFromSpend(private_spend_key, private_view_key);
 
     wallet->initializeWithViewKey(conf.walletFile, conf.walletPassword, private_view_key, conf.scanHeight, false);
 
@@ -473,7 +442,7 @@ void generateNewWallet(const CryptoNote::Currency& currency, const WalletConfigu
 }
 
 WalletService::WalletService(const CryptoNote::Currency& currency, System::Dispatcher& sys, CryptoNote::INode& node,
-  CryptoNote::WalletGreen& wallet, CryptoNote::IFusionManager& fusionManager, const WalletConfiguration& conf, std::shared_ptr<Logging::ILogger> logger) :
+  CryptoNote::IWallet& wallet, CryptoNote::IFusionManager& fusionManager, const WalletConfiguration& conf, std::shared_ptr<Logging::ILogger> logger) :
     currency(currency),
     wallet(wallet),
     fusionManager(fusionManager),
@@ -829,7 +798,7 @@ std::error_code WalletService::getMnemonicSeed(const std::string& address, std::
 
     Crypto::SecretKey deterministic_private_view_key;
 
-    Crypto::crypto_ops::generateViewFromSpend(key.secretKey, deterministic_private_view_key);
+    CryptoNote::AccountBase::generateViewFromSpend(key.secretKey, deterministic_private_view_key);
 
     bool deterministic_private_keys = deterministic_private_view_key == viewKey.secretKey;
 
@@ -1052,7 +1021,7 @@ std::error_code WalletService::sendTransaction(SendTransaction::Request& request
       validateAddresses({ request.changeAddress }, currency, logger);
     }
 
-    auto [success, error, error_code] = validateMixin(request.anonymity, node.getLastKnownBlockHeight());
+    auto [success, error, error_code] = CryptoNote::Mixins::validate(request.anonymity, node.getLastKnownBlockHeight());
 
     if (!success)
     {
@@ -1371,7 +1340,7 @@ std::error_code WalletService::createIntegratedAddress(const std::string &addres
   CryptoNote::AccountPublicAddress addr;
 
   /* Get the private + public key from the address */
-  Utilities::parseAccountAddressString(prefix, addr, address);
+  CryptoNote::parseAccountAddressString(prefix, addr, address);
 
   /* Pack as a binary array */
   CryptoNote::BinaryArray ba;

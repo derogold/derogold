@@ -30,10 +30,6 @@ class SynchronizationStatus
 
         std::vector<Crypto::Hash> getBlockHashCheckpoints() const;
 
-        std::deque<Crypto::Hash> getBlockCheckpoints() const;
-
-        std::deque<Crypto::Hash> getRecentBlockHashes() const;
-
         /* Converts the class to a json object */
         void toJSON(rapidjson::Writer<rapidjson::StringBuffer> &writer) const;
 
@@ -61,8 +57,4 @@ class SynchronizationStatus
 
         /* The last block height we are aware of */
         uint64_t m_lastKnownBlockHeight = 0;
-        
-        /* The last height we saved a block checkpoint at. Can't do every 5k
-           since we skip blocks with coinbase tx scanning of. */
-        uint64_t m_lastSavedCheckpointAt = 0;
 };

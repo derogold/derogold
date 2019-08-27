@@ -1,7 +1,7 @@
-/* $Id: minihttptestserver.c,v 1.23 2018/01/15 16:20:07 nanard Exp $ */
+/* $Id: minihttptestserver.c,v 1.13 2012/05/29 13:03:07 nanard Exp $ */
 /* Project : miniUPnP
  * Author : Thomas Bernard
- * Copyright (c) 2011-2018 Thomas Bernard
+ * Copyright (c) 2011-2012 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution.
  * */
@@ -18,13 +18,7 @@
 #include <time.h>
 #include <errno.h>
 
-#ifndef INADDR_LOOPBACK
-#define INADDR_LOOPBACK         0x7f000001
-#endif
-
 #define CRAP_LENGTH (2048)
-
-static int server(unsigned short port, const char * expected_file_name, int ipv6);
 
 volatile sig_atomic_t quit = 0;
 volatile sig_atomic_t child_to_wait_for = 0;
@@ -34,25 +28,25 @@ volatile sig_atomic_t child_to_wait_for = 0;
  */
 void handle_signal_chld(int sig)
 {
-	(void)sig;
-	/* printf("handle_signal_chld(%d)\n", sig); */
+	printf("handle_signal_chld(%d)\n", sig);
 	++child_to_wait_for;
 }
 
 /**
  * signal handler for SIGINT (CRTL C)
  */
+#if 0
 void handle_signal_int(int sig)
 {
-	(void)sig;
-	/* printf("handle_signal_int(%d)\n", sig); */
+	printf("handle_signal_int(%d)\n", sig);
 	quit = 1;
 }
+#endif
 
 /**
  * build a text/plain content of the specified length
  */
-void build_content(char * p, size_t n)
+void build_content(char * p, int n)
 {
 	char line_buffer[80];
 	int k;
@@ -81,10 +75,10 @@ void build_content(char * p, size_t n)
 /**
  * build crappy content
  */
-void build_crap(char * p, size_t n)
+void build_crap(char * p, int n)
 {
 	static const char crap[] = "_CRAP_\r\n";
-	size_t i;
+	int i;
 
 	while(n > 0) {
 		i = sizeof(crap) - 1;
@@ -100,19 +94,15 @@ void build_crap(char * p, size_t n)
  * build chunked response.
  * return a malloc'ed buffer
  */
-char * build_chunked_response(size_t content_length, size_t * response_len)
-{
+char * build_chunked_response(int content_length, int * response_len) {
 	char * response_buffer;
 	char * content_buffer;
-	size_t buffer_length;
-	size_t i;
-	unsigned int n;
+	int buffer_length;
+	int i, n;
 
 	/* allocate to have some margin */
 	buffer_length = 256 + content_length + (content_length >> 4);
 	response_buffer = malloc(buffer_length);
-	if(response_buffer == NULL)
-		return NULL;
 	*response_len = snprintf(response_buffer, buffer_length,
 	                         "HTTP/1.1 200 OK\r\n"
 	                         "Content-Type: text/plain\r\n"
@@ -121,10 +111,6 @@ char * build_chunked_response(size_t content_length, size_t * response_len)
 
 	/* build the content */
 	content_buffer = malloc(content_length);
-	if(content_buffer == NULL) {
-		free(response_buffer);
-		return NULL;
-	}
 	build_content(content_buffer, content_length);
 
 	/* chunk it */
@@ -150,120 +136,12 @@ char * build_chunked_response(size_t content_length, size_t * response_len)
 	*response_len += 5;
 	free(content_buffer);
 
-	printf("resp_length=%lu buffer_length=%lu content_length=%lu\n",
+	printf("resp_length=%d buffer_length=%d content_length=%d\n",
 	       *response_len, buffer_length, content_length);
 	return response_buffer;
 }
 
-/* favicon.ico generator */
-#ifdef OLD_HEADER
-#define FAVICON_LENGTH (6 + 16 + 12 + 8 + 32 * 4)
-#else
-#define FAVICON_LENGTH (6 + 16 + 40 + 8 + 32 * 4)
-#endif
-void build_favicon_content(unsigned char * p, size_t n)
-{
-	int i;
-	if(n < FAVICON_LENGTH)
-		return;
-	/* header : 6 bytes */
-	*p++ = 0;
-	*p++ = 0;
-	*p++ = 1;	/* type : ICO */
-	*p++ = 0;
-	*p++ = 1;	/* number of images in file */
-	*p++ = 0;
-	/* image directory (1 entry) : 16 bytes */
-	*p++ = 16;	/* width */
-	*p++ = 16;	/* height */
-	*p++ = 2;	/* number of colors in the palette. 0 = no palette */
-	*p++ = 0;	/* reserved */
-	*p++ = 1;	/* color planes */
-	*p++ = 0;	/* " */
-	*p++ = 1;	/* bpp */
-	*p++ = 0;	/* " */
-#ifdef OLD_HEADER
-	*p++ = 12 + 8 + 32 * 4;	/* bmp size */
-#else
-	*p++ = 40 + 8 + 32 * 4;	/* bmp size */
-#endif
-	*p++ = 0;	/* " */
-	*p++ = 0;	/* " */
-	*p++ = 0;	/* " */
-	*p++ = 6 + 16;	/* bmp offset */
-	*p++ = 0;	/* " */
-	*p++ = 0;	/* " */
-	*p++ = 0;	/* " */
-	/* BMP */
-#ifdef OLD_HEADER
-	/* BITMAPCOREHEADER */
-	*p++ = 12;	/* size of this header */
-	*p++ = 0;	/* " */
-	*p++ = 0;	/* " */
-	*p++ = 0;	/* " */
-	*p++ = 16;	/* width */
-	*p++ = 0;	/* " */
-	*p++ = 16 * 2;	/* height x 2 ! */
-	*p++ = 0;	/* " */
-	*p++ = 1;	/* color planes */
-	*p++ = 0;	/* " */
-	*p++ = 1;	/* bpp */
-	*p++ = 0;	/* " */
-#else
-	/* BITMAPINFOHEADER */
-	*p++ = 40;	/* size of this header */
-	*p++ = 0;	/* " */
-	*p++ = 0;	/* " */
-	*p++ = 0;	/* " */
-	*p++ = 16;	/* width */
-	*p++ = 0;	/* " */
-	*p++ = 0;	/* " */
-	*p++ = 0;	/* " */
-	*p++ = 16 * 2;	/* height x 2 ! */
-	*p++ = 0;	/* " */
-	*p++ = 0;	/* " */
-	*p++ = 0;	/* " */
-	*p++ = 1;	/* color planes */
-	*p++ = 0;	/* " */
-	*p++ = 1;	/* bpp */
-	*p++ = 0;	/* " */
-	/* compression method, image size, ppm x, ppm y */
-	/* colors in the palette ? */
-	/* important colors */
-	for(i = 4 * 6; i > 0; --i)
-		*p++ = 0;
-#endif
-	/* palette */
-	*p++ = 0;	/* b */
-	*p++ = 0;	/* g */
-	*p++ = 0;	/* r */
-	*p++ = 0;	/* reserved */
-	*p++ = 255;	/* b */
-	*p++ = 255;	/* g */
-	*p++ = 255;	/* r */
-	*p++ = 0;	/* reserved */
-	/* pixel data */
-	for(i = 16; i > 0; --i) {
-		if(i & 1) {
-			*p++ = 0125;
-			*p++ = 0125;
-		} else {
-			*p++ = 0252;
-			*p++ = 0252;
-		}
-		*p++ = 0;
-		*p++ = 0;
-	}
-	/* Opacity MASK */
-	for(i = 16 * 4; i > 0; --i) {
-		*p++ = 0;
-	}
-}
-
-enum modes {
-	MODE_INVALID, MODE_CHUNKED, MODE_ADDCRAP, MODE_NORMAL, MODE_FAVICON
-};
-
+enum modes { MODE_INVALID, MODE_CHUNKED, MODE_ADDCRAP, MODE_NORMAL };
 const struct {
 	const enum modes mode;
 	const char * text;
@@ -271,19 +149,18 @@ const struct {
 	{MODE_CHUNKED, "chunked"},
 	{MODE_ADDCRAP, "addcrap"},
 	{MODE_NORMAL, "normal"},
-	{MODE_FAVICON, "favicon.ico"},
 	{MODE_INVALID, NULL}
 };
 
 /**
  * write the response with random behaviour !
  */
-void send_response(int c, const char * buffer, size_t len)
+void send_response(int c, const char * buffer, int len)
 {
-	ssize_t n;
+	int n;
 	while(len > 0) {
 		n = (rand() % 99) + 1;
-		if((size_t)n > len)
+		if(n > len)
 			n = len;
 		n = write(c, buffer, n);
 		if(n < 0) {
@@ -295,8 +172,8 @@ void send_response(int c, const char * buffer, size_t len)
 		} else {
 			len -= n;
 			buffer += n;
-			usleep(10000); /* 10ms */
 		}
+		usleep(10000); /* 10ms */
 	}
 }
 
@@ -306,27 +183,24 @@ void send_response(int c, const char * buffer, size_t len)
 void handle_http_connection(int c)
 {
 	char request_buffer[2048];
-	size_t request_len = 0;
+	int request_len = 0;
 	int headers_found = 0;
-	ssize_t n, m;
-	size_t i;
+	int n, i;
 	char request_method[16];
 	char request_uri[256];
 	char http_version[16];
 	char * p;
 	char * response_buffer;
-	size_t response_len;
+	int response_len;
 	enum modes mode;
-	size_t content_length = 16*1024;
+	int content_length = 16*1024;
 
 	/* read the request */
-	while(request_len < sizeof(request_buffer) && !headers_found) {
+	while(request_len < (int)sizeof(request_buffer) && !headers_found) {
 		n = read(c,
 		         request_buffer + request_len,
 		         sizeof(request_buffer) - request_len);
 		if(n < 0) {
-			if(errno == EINTR)
-				continue;
 			perror("read");
 			return;
 		} else if(n==0) {
@@ -345,13 +219,12 @@ void handle_http_connection(int c)
 	}
 	if(!headers_found) {
 		/* error */
-		printf("no HTTP header found in the request\n");
 		return;
 	}
-	printf("headers :\n%.*s", (int)request_len, request_buffer);
+	printf("headers :\n%.*s", request_len, request_buffer);
 	/* the request have been received, now parse the request line */
 	p = request_buffer;
-	for(i = 0; i < sizeof(request_method) - 1; i++) {
+	for(i = 0; i < (int)sizeof(request_method) - 1; i++) {
 		if(*p == ' ' || *p == '\r')
 			break;
 		request_method[i] = *p;
@@ -389,15 +262,15 @@ void handle_http_connection(int c)
 		n = sizeof(response405) - 1;
 		pc = response405;
 		while(n > 0) {
-			m = write(c, pc, n);
-			if(m<0) {
+			i = write(c, pc, n);
+			if(i<0) {
 				if(errno != EINTR) {
 					perror("write");
 					return;
 				}
 			} else {
-				n -= m;
-				pc += m;
+				n -= i;
+				pc += i;
 			}
 		}
 		return;
@@ -419,61 +292,27 @@ void handle_http_connection(int c)
 	case MODE_ADDCRAP:
 		response_len = content_length+256;
 		response_buffer = malloc(response_len);
-		if(!response_buffer)
-			break;
 		n = snprintf(response_buffer, response_len,
 		             "HTTP/1.1 200 OK\r\n"
 		             "Server: minihttptestserver\r\n"
 		             "Content-Type: text/plain\r\n"
-		             "Content-Length: %lu\r\n"
+		             "Content-Length: %d\r\n"
 		             "\r\n", content_length);
 		response_len = content_length+n+CRAP_LENGTH;
-		p = realloc(response_buffer, response_len);
-		if(p == NULL) {
-			/* error 500 */
-			free(response_buffer);
-			response_buffer = NULL;
-			break;
-		}
-		response_buffer = p;
+		response_buffer = realloc(response_buffer, response_len);
 		build_content(response_buffer + n, content_length);
 		build_crap(response_buffer + n + content_length, CRAP_LENGTH);
-		break;
-	case MODE_FAVICON:
-		content_length = FAVICON_LENGTH;
-		response_len = content_length + 256;
-		response_buffer = malloc(response_len);
-		if(!response_buffer)
-			break;
-		n = snprintf(response_buffer, response_len,
-		             "HTTP/1.1 200 OK\r\n"
-		             "Server: minihttptestserver\r\n"
-		             "Content-Type: image/vnd.microsoft.icon\r\n"
-		             "Content-Length: %lu\r\n"
-		             "\r\n", content_length);
-		/* image/x-icon */
-		build_favicon_content((unsigned char *)(response_buffer + n), content_length);
-		response_len = content_length + n;
 		break;
 	default:
 		response_len = content_length+256;
 		response_buffer = malloc(response_len);
-		if(!response_buffer)
-			break;
 		n = snprintf(response_buffer, response_len,
 		             "HTTP/1.1 200 OK\r\n"
 		             "Server: minihttptestserver\r\n"
 		             "Content-Type: text/plain\r\n"
 		             "\r\n");
 		response_len = content_length+n;
-		p = realloc(response_buffer, response_len);
-		if(p == NULL) {
-			/* Error 500 */
-			free(response_buffer);
-			response_buffer = NULL;
-			break;
-		}
-		response_buffer = p;
+		response_buffer = realloc(response_buffer, response_len);
 		build_content(response_buffer + n, response_len - n);
 	}
 
@@ -489,8 +328,15 @@ void handle_http_connection(int c)
  */
 int main(int argc, char * * argv) {
 	int ipv6 = 0;
-	int r, i;
+	int s, c, i;
 	unsigned short port = 0;
+	struct sockaddr_storage server_addr;
+	socklen_t server_addrlen;
+	struct sockaddr_storage client_addr;
+	socklen_t client_addrlen;
+	pid_t pid;
+	int child = 0;
+	int status;
 	const char * expected_file_name = NULL;
 
 	for(i = 1; i < argc; i++) {
@@ -513,46 +359,15 @@ int main(int argc, char * * argv) {
 				fprintf(stderr, "unknown command line switch '%s'\n", argv[i]);
 			}
 		} else {
-			fprintf(stderr, "unknown command line argument '%s'\n", argv[i]);
+			fprintf(stderr, "unkown command line argument '%s'\n", argv[i]);
 		}
 	}
 
 	srand(time(NULL));
-
-	r = server(port, expected_file_name, ipv6);
-	if(r != 0) {
-		printf("*** ERROR ***\n");
-	}
-	return r;
-}
-
-static int server(unsigned short port, const char * expected_file_name, int ipv6)
-{
-	int s, c;
-	int i;
-	struct sockaddr_storage server_addr;
-	socklen_t server_addrlen;
-	struct sockaddr_storage client_addr;
-	socklen_t client_addrlen;
-	pid_t pid;
-	int child = 0;
-	int status;
-	struct sigaction sa;
-
-	memset(&sa, 0, sizeof(struct sigaction));
-
-	/*signal(SIGCHLD, handle_signal_chld);*/
-	sa.sa_handler = handle_signal_chld;
-	if(sigaction(SIGCHLD, &sa, NULL) < 0) {
-		perror("sigaction");
-		return 1;
-	}
-	/*signal(SIGINT, handle_signal_int);*/
-	sa.sa_handler = handle_signal_int;
-	if(sigaction(SIGINT, &sa, NULL) < 0) {
-		perror("sigaction");
-		return 1;
-	}
+	signal(SIGCHLD, handle_signal_chld);
+#if 0
+	signal(SIGINT, handle_signal_int);
+#endif
 
 	s = socket(ipv6 ? AF_INET6 : AF_INET, SOCK_STREAM, 0);
 	if(s < 0) {
@@ -604,16 +419,12 @@ static int server(unsigned short port, const char * expected_file_name, int ipv6
 		if(f) {
 			char * buffer;
 			buffer = malloc(16*1024);
-			if(buffer == NULL) {
-				fprintf(stderr, "memory allocation error\n");
-			} else {
-				build_content(buffer, 16*1024);
-				i = fwrite(buffer, 1, 16*1024, f);
-				if(i != 16*1024) {
-					fprintf(stderr, "error writing to file %s : %dbytes written (out of %d)\n", expected_file_name, i, 16*1024);
-				}
-				free(buffer);
+			build_content(buffer, 16*1024);
+			i = fwrite(buffer, 1, 16*1024, f);
+			if(i != 16*1024) {
+				fprintf(stderr, "error writing to file %s : %dbytes written (out of %d)\n", expected_file_name, i, 16*1024);
 			}
+			free(buffer);
 			fclose(f);
 		} else {
 			fprintf(stderr, "error opening file %s for writing\n", expected_file_name);
@@ -627,16 +438,16 @@ static int server(unsigned short port, const char * expected_file_name, int ipv6
 			if(pid < 0) {
 				perror("wait");
 			} else {
-				printf("child(%d) terminated with status %d\n", (int)pid, status);
+				printf("child(%d) terminated with status %d\n", pid, status);
 			}
 			--child_to_wait_for;
 		}
+		/* TODO : add a select() call in order to handle the case
+		 * when a signal is caught */
 		client_addrlen = sizeof(struct sockaddr_storage);
 		c = accept(s, (struct sockaddr *)&client_addr,
 		           &client_addrlen);
 		if(c < 0) {
-			if(errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
-				continue;
 			perror("accept");
 			return 1;
 		}
@@ -664,7 +475,7 @@ static int server(unsigned short port, const char * expected_file_name, int ipv6
 			if(pid < 0) {
 				perror("wait");
 			} else {
-				printf("child(%d) terminated with status %d\n", (int)pid, status);
+				printf("child(%d) terminated with status %d\n", pid, status);
 			}
 			--child_to_wait_for;
 		}

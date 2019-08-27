@@ -16,13 +16,12 @@
 #include "Common/ShuffleGenerator.h"
 
 #include "CryptoNoteCore/CryptoNoteBasicImpl.h"
-#include "Common/CryptoNoteTools.h"
+#include "CryptoNoteCore/CryptoNoteSerialization.h"
+#include "CryptoNoteCore/CryptoNoteTools.h"
 #include "CryptoNoteCore/BlockchainStorage.h"
-#include "Common/TransactionExtra.h"
+#include "CryptoNoteCore/TransactionExtra.h"
 
-#include "Serialization/CryptoNoteSerialization.h"
 #include "Serialization/SerializationOverloads.h"
-
 #include "TransactionValidatiorState.h"
 
 namespace CryptoNote {
@@ -595,45 +594,6 @@ size_t BlockchainCache::getTransactionCount() const {
   return count;
 }
 
-std::vector<RawBlock> BlockchainCache::getNonEmptyBlocks(
-    const uint64_t startHeight,
-    const size_t blockCount) const
-{
-    std::vector<RawBlock> blocks;
-
-    if (startHeight < startIndex)
-    {
-        blocks = parent->getNonEmptyBlocks(startHeight, blockCount);
-
-        if (blocks.size() == blockCount)
-        {
-            return blocks;
-        }
-    }
-
-    uint64_t startOffset = std::max(startHeight, static_cast<uint64_t>(startIndex));
-
-    uint64_t storageBlockCount = storage->getBlockCount();
-
-    uint64_t i = startOffset;
-
-    while (blocks.size() < blockCount && i < startIndex + storageBlockCount)
-    {
-        auto block = storage->getBlockByIndex(i - startIndex);
-
-        i++;
-
-        if (block.transactions.empty())
-        {
-            continue;
-        }
-
-        blocks.push_back(block);
-    }
-
-    return blocks;
-}
-
 std::vector<RawBlock> BlockchainCache::getBlocksByHeight(
     const uint64_t startHeight, uint64_t endHeight) const
 {
@@ -847,18 +807,6 @@ bool BlockchainCache::isTransactionSpendTimeUnlocked(uint64_t unlockTime, uint32
   if (unlockTime < currency.maxBlockHeight()) {
     // interpret as block index
     return blockIndex + currency.lockedTxAllowedDeltaBlocks() >= unlockTime;
-  }
-
-  if (blockIndex >= CryptoNote::parameters::TRANSACTION_INPUT_BLOCKTIME_VALIDATION_HEIGHT)
-  {
-    /* Get the last block timestamp from an existing method call */
-    const std::vector<uint64_t> lastBlockTimestamps = getLastTimestamps(1);
-
-    /* Pop the last timestamp off the vector */
-    const uint64_t lastBlockTimestamp = lastBlockTimestamps.at(0);
-
-    /* Compare our delta seconds plus our last time stamp against the unlock time */
-    return lastBlockTimestamp + currency.lockedTxAllowedDeltaSeconds() >= unlockTime;
   }
 
   // interpret as time
@@ -1144,9 +1092,9 @@ uint64_t BlockchainCache::getDifficultyForNextBlock() const {
 uint64_t BlockchainCache::getDifficultyForNextBlock(uint32_t blockIndex) const {
   assert(blockIndex <= getTopBlockIndex());
   uint8_t nextBlockMajorVersion = getBlockMajorVersionForHeight(blockIndex+1);
-  auto timestamps = getLastTimestamps(currency.difficultyBlocksCountByBlockVersion(nextBlockMajorVersion, blockIndex), blockIndex, skipGenesisBlock);
+  auto timestamps = getLastTimestamps(CryptoNote::parameters::DIFFICULTY_BLOCKS_COUNT, blockIndex, skipGenesisBlock);
   auto commulativeDifficulties =
-      getLastCumulativeDifficulties(currency.difficultyBlocksCountByBlockVersion(nextBlockMajorVersion, blockIndex), blockIndex, skipGenesisBlock);
+      getLastCumulativeDifficulties(CryptoNote::parameters::DIFFICULTY_BLOCKS_COUNT, blockIndex, skipGenesisBlock);
   return currency.getNextDifficulty(nextBlockMajorVersion, blockIndex, std::move(timestamps), std::move(commulativeDifficulties));
 }
 

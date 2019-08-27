@@ -10,17 +10,11 @@
 
 #include <SubWallets/SubWallets.h>
 
-#include <Utilities/ThreadSafeDeque.h>
-#include <Utilities/ThreadSafePriorityQueue.h>
-
-#include <WalletBackend/BlockDownloader.h>
 #include <WalletBackend/EventHandler.h>
+#include <WalletBackend/ThreadSafeQueue.h>
 #include <WalletBackend/SynchronizationStatus.h>
 
 #include <WalletTypes.h>
-
-typedef std::vector<std::tuple<Crypto::PublicKey, WalletTypes::TransactionInput>> BlockInputsAndOwners;
-typedef std::tuple<WalletTypes::WalletBlockInfo, BlockInputsAndOwners, uint32_t> SemiProcessedBlock;
 
 /* Used to store the data we have accumulating when scanning a specific
    block. We can't add the items directly, because we may stop midway
@@ -32,21 +26,10 @@ struct BlockScanTmpInfo
 
     /* The corresponding inputs to the transactions, indexed by public key
        (i.e., the corresponding subwallet to add the input to) */
-    BlockInputsAndOwners inputsToAdd;
+    std::vector<std::tuple<Crypto::PublicKey, WalletTypes::TransactionInput>> inputsToAdd;
 
     /* Need to mark these as spent so we don't include them later */
     std::vector<std::tuple<Crypto::PublicKey, Crypto::KeyImage>> keyImagesToMarkSpent;
-};
-
-class OrderByArrivalIndex
-{
-    public:
-        /* Ordering based on the arrival index of the blocks, not on the block
-           height. This is needed to ensure correct handling of network forks. */
-        bool operator() (SemiProcessedBlock a, SemiProcessedBlock b)
-        {
-            return std::get<2>(a) > std::get<2>(b);
-        }
 };
 
 class WalletSynchronizer
@@ -65,8 +48,7 @@ class WalletSynchronizer
             const uint64_t startTimestamp,
             const uint64_t startHeight,
             const Crypto::SecretKey privateViewKey,
-            const std::shared_ptr<EventHandler> eventHandler,
-            unsigned int threadCount);
+            const std::shared_ptr<EventHandler> eventHandler);
 
         /* Delete the copy constructor */
         WalletSynchronizer(const WalletSynchronizer &) = delete;
@@ -99,8 +81,7 @@ class WalletSynchronizer
 
         void initializeAfterLoad(
             const std::shared_ptr<Nigel> daemon,
-            const std::shared_ptr<EventHandler> eventHandler,
-            unsigned int threadCount);
+            const std::shared_ptr<EventHandler> eventHandler);
 
         void reset(
             const uint64_t startHeight,
@@ -112,8 +93,13 @@ class WalletSynchronizer
 
         void setSyncStart(const uint64_t startTimestamp, const uint64_t startHeight);
 
-        void setSubWallets(const std::shared_ptr<SubWallets> subWallets);
-        
+        /////////////////////////////
+        /* Public member variables */
+        /////////////////////////////
+
+        /* The sub wallets (shared with the main class) */
+        std::shared_ptr<SubWallets> m_subWallets;
+
     private:
 
         //////////////////////////////
@@ -122,14 +108,12 @@ class WalletSynchronizer
 
         void mainLoop();
 
-        void blockProcessingThread();
+        std::vector<WalletTypes::WalletBlockInfo> downloadBlocks();
 
         std::vector<std::tuple<Crypto::PublicKey, WalletTypes::TransactionInput>> processBlockOutputs(
             const WalletTypes::WalletBlockInfo &block) const;
 
-        void completeBlockProcessing(
-            const WalletTypes::WalletBlockInfo &block,
-            const std::vector<std::tuple<Crypto::PublicKey, WalletTypes::TransactionInput>> &ourInputs);
+        void processBlock(const WalletTypes::WalletBlockInfo &block);
 
         BlockScanTmpInfo processBlockTransactions(
             const WalletTypes::WalletBlockInfo &block,
@@ -165,6 +149,8 @@ class WalletSynchronizer
         /* An atomic bool to signal if we should stop the sync thread */
         std::atomic<bool> m_shouldStop;
 
+        SynchronizationStatus m_syncStatus;
+
         /* The timestamp to start scanning downloading block data from */
         uint64_t m_startTimestamp;
 
@@ -179,34 +165,4 @@ class WalletSynchronizer
 
         /* The daemon connection */
         std::shared_ptr<Nigel> m_daemon;
-
-        BlockDownloader m_blockDownloader;
-
-        /* The sub wallets (shared with the main class) */
-        std::shared_ptr<SubWallets> m_subWallets;
-
-        /* Stores blocks for processing by processing threads */
-        ThreadSafeDeque<std::tuple<WalletTypes::WalletBlockInfo, uint32_t>> m_blockProcessingQueue;
-
-        /* Synchronizes the child threads waiting for blocks to process
-           and the parent pushing blocks in */
-        std::condition_variable m_haveBlocksToProcess;
-
-        /* Synchronizes the child threads pushing blocks into the priority
-           queue and the parent thread waiting for them all to arrive */
-        std::condition_variable m_haveProcessedBlocksToHandle;
-
-        std::mutex m_mutex;
-
-        /* yeah.... that's a thread safe queue, which holds a block, and it's
-           corresponding inputs, and the subwallet public key that each input
-           belongs to. The blocks which arrived earlier come at the front of
-           the queue. */
-        ThreadSafePriorityQueue<SemiProcessedBlock, OrderByArrivalIndex> m_processedBlocks;
-
-        /* Amount of sync threads to run */
-        unsigned int m_threadCount;
-
-        /* Stores thread ids of the block output processing threads */
-        std::vector<std::thread> m_syncThreads;
 };

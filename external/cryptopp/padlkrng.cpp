@@ -17,18 +17,15 @@
 
 NAMESPACE_BEGIN(CryptoPP)
 
-std::string PadlockRNG::AlgorithmProvider() const
-{
-    return "Padlock";
-}
-
 PadlockRNG::PadlockRNG(word32 divisor)
-	: m_divisor(DivisorHelper(divisor)), m_msr(0)
+: m_divisor(DivisorHelper(divisor)), m_msr(0)
 {
 #if defined(CRYPTOPP_X86_ASM_AVAILABLE)
 	if (!HasPadlockRNG())
-#endif
 		throw PadlockRNG_Err("PadlockRNG", "PadlockRNG generator not available");
+#else
+	throw PadlockRNG_Err("PadlockRNG", "PadlockRNG generator not available");
+#endif
 }
 
 void PadlockRNG::GenerateBlock(byte *output, size_t size)
@@ -52,7 +49,7 @@ void PadlockRNG::GenerateBlock(byte *output, size_t size)
 
 			: "=g" (m_msr) : "g" (m_buffer.data()), "g" (m_divisor)
 #if (CRYPTOPP_BOOL_X32 || CRYPTOPP_BOOL_X64)
-			: "rax", "rdx", "rdi", "cc"
+			: "eax", "edx", "rdi", "cc"
 #else
 			: "eax", "edx", "edi", "cc"
 #endif

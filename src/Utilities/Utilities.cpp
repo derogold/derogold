@@ -12,9 +12,10 @@
 
 #include <config/CryptoNoteConfig.h>
 
-#include <thread>
+#include <CryptoNoteCore/CryptoNoteBasicImpl.h>
+#include <CryptoNoteCore/CryptoNoteTools.h>
 
-#include <Utilities/String.h>
+#include <thread>
 
 namespace Utilities
 {
@@ -178,9 +179,7 @@ uint64_t getCurrentTimestampAdjusted()
     /* Take the amount of time a block can potentially be in the past/future */
     std::initializer_list<uint64_t> limits =
     {
-        CryptoNote::parameters::CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT,
-        CryptoNote::parameters::CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT_V3,
-        CryptoNote::parameters::CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT_V4
+        CryptoNote::parameters::CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT
     };
 
     /* Get the largest adjustment possible */
@@ -189,65 +188,5 @@ uint64_t getCurrentTimestampAdjusted()
     /* Take the earliest timestamp that will include all possible blocks */
     return time - adjust;
 }
-
-bool parseDaemonAddressFromString(std::string &host, uint16_t &port, std::string address)
-{
-    /* Lets users enter url's instead of host:port */
-    address = Utilities::removePrefix(address, "https://");
-    address = Utilities::removePrefix(address, "http://");
-
-    std::vector<std::string> parts = Utilities::split(address, ':');
-
-    if (parts.empty())
-    {
-        return false;
-    }
-    else if (parts.size() >= 2)
-    {
-        try
-        {
-            host = parts.at(0);
-            port = std::stoi(parts.at(1));
-            return true;
-        }
-        catch (const std::invalid_argument &)
-        {
-            return false;
-        }
-    }
-
-    host = parts.at(0);
-    port = CryptoNote::RPC_DEFAULT_PORT;
-
-    return true;
-}
-
-size_t getApproximateMaximumInputCount(
-    const size_t transactionSize,
-    const size_t outputCount,
-    const size_t mixinCount) {
-
-    const size_t KEY_IMAGE_SIZE = sizeof(Crypto::KeyImage);
-    const size_t OUTPUT_KEY_SIZE = sizeof(decltype(CryptoNote::KeyOutput::key));
-    const size_t AMOUNT_SIZE = sizeof(uint64_t) + 2; //varint
-    const size_t GLOBAL_INDEXES_VECTOR_SIZE_SIZE = sizeof(uint8_t);//varint
-    const size_t GLOBAL_INDEXES_INITIAL_VALUE_SIZE = sizeof(uint32_t);//varint
-    const size_t GLOBAL_INDEXES_DIFFERENCE_SIZE = sizeof(uint32_t);//varint
-    const size_t SIGNATURE_SIZE = sizeof(Crypto::Signature);
-    const size_t EXTRA_TAG_SIZE = sizeof(uint8_t);
-    const size_t INPUT_TAG_SIZE = sizeof(uint8_t);
-    const size_t OUTPUT_TAG_SIZE = sizeof(uint8_t);
-    const size_t PUBLIC_KEY_SIZE = sizeof(Crypto::PublicKey);
-    const size_t TRANSACTION_VERSION_SIZE = sizeof(uint8_t);
-    const size_t TRANSACTION_UNLOCK_TIME_SIZE = sizeof(uint64_t);
-
-    const size_t outputsSize = outputCount * (OUTPUT_TAG_SIZE + OUTPUT_KEY_SIZE + AMOUNT_SIZE);
-    const size_t headerSize = TRANSACTION_VERSION_SIZE + TRANSACTION_UNLOCK_TIME_SIZE + EXTRA_TAG_SIZE + PUBLIC_KEY_SIZE;
-    const size_t inputSize = INPUT_TAG_SIZE + AMOUNT_SIZE + KEY_IMAGE_SIZE + SIGNATURE_SIZE + GLOBAL_INDEXES_VECTOR_SIZE_SIZE + GLOBAL_INDEXES_INITIAL_VALUE_SIZE +
-                            mixinCount * (GLOBAL_INDEXES_DIFFERENCE_SIZE + SIGNATURE_SIZE);
-
-    return (transactionSize - headerSize - outputsSize) / inputSize;
-}
-
 
 } // namespace Utilities

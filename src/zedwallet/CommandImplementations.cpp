@@ -13,7 +13,7 @@
 #include <config/WalletConfig.h>
 
 #include <CryptoNoteCore/Account.h>
-#include <Common/TransactionExtra.h>
+#include <CryptoNoteCore/TransactionExtra.h>
 
 #ifndef MSVC
 #include <fstream>
@@ -21,11 +21,10 @@
 
 #include <Mnemonics/Mnemonics.h>
 
-#include <Utilities/ColouredMsg.h>
 #include <Utilities/FormatTools.h>
-#include <Utilities/ParseExtra.h>
 
 #include <zedwallet/AddressBook.h>
+#include <Utilities/ColouredMsg.h>
 #include <zedwallet/Commands.h>
 #include <zedwallet/Fusion.h>
 #include <zedwallet/Menu.h>
@@ -79,7 +78,7 @@ void printPrivateKeys(CryptoNote::WalletGreen &wallet, bool viewWallet)
 
     Crypto::SecretKey derivedPrivateViewKey;
 
-    Crypto::crypto_ops::generateViewFromSpend(privateSpendKey,
+    CryptoNote::AccountBase::generateViewFromSpend(privateSpendKey,
                                                    derivedPrivateViewKey);
 
     const bool deterministicPrivateKeys
@@ -443,7 +442,7 @@ void printOutgoingTransfer(CryptoNote::WalletTransaction t,
               << WarningMsg("Total Spent: " + formatAmount(-t.totalAmount))
               << std::endl;
 
-    const std::string paymentID = Utilities::getPaymentIDFromExtra(Common::asBinaryArray(t.extra));
+    const std::string paymentID = getPaymentIDFromExtra(t.extra);
 
     if (paymentID != "")
     {
@@ -475,7 +474,7 @@ void printIncomingTransfer(CryptoNote::WalletTransaction t,
     std::cout << SuccessMsg("Amount: " + formatAmount(t.totalAmount))
               << std::endl;
 
-    const std::string paymentID = Utilities::getPaymentIDFromExtra(Common::asBinaryArray(t.extra));
+    const std::string paymentID = getPaymentIDFromExtra(t.extra);
 
     if (paymentID != "")
     {

@@ -7,11 +7,7 @@
 NAMESPACE_BEGIN(CryptoPP)
 NAMESPACE_BEGIN(KalynaTab)
 
-extern const word64 T[8][256];  // Columns
-extern const word64 IT[8][256]; // Inverse
-extern const byte S[4][256];    // Substitution
-extern const byte IS[4][256];   // Inverse
-
+CRYPTOPP_TABLE
 const word64 T[8][256] =
 {
     {
@@ -544,6 +540,7 @@ const word64 T[8][256] =
     }
 };
 
+CRYPTOPP_TABLE
 const word64 IT[8][256] =
 {
     {
@@ -1076,6 +1073,7 @@ const word64 IT[8][256] =
     }
 };
 
+CRYPTOPP_TABLE
 const byte S[4][256] =
 {
     {
@@ -1152,6 +1150,7 @@ const byte S[4][256] =
     }
 };
 
+CRYPTOPP_TABLE
 const byte IS[4][256] =
 {
     {

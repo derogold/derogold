@@ -99,8 +99,7 @@ inline void SIMON64_ExpandKey_3W(word32 key[42], const word32 k[3])
     key[0] = k[2]; key[1] = k[1]; key[2] = k[0];
     for (size_t i = 3; i<42; ++i)
     {
-        key[i] = static_cast<word32>(c ^ (z & 1) ^ key[i - 3] ^
-            rotrConstant<3>(key[i - 1]) ^ rotrConstant<4>(key[i - 1]));
+        key[i] = c ^ (z & 1) ^ key[i - 3] ^ rotrConstant<3>(key[i - 1]) ^ rotrConstant<4>(key[i - 1]);
         z >>= 1;
     }
 }
@@ -118,9 +117,7 @@ inline void SIMON64_ExpandKey_4W(word32 key[44], const word32 k[4])
     key[0] = k[3]; key[1] = k[2]; key[2] = k[1]; key[3] = k[0];
     for (size_t i = 4; i<44; ++i)
     {
-        key[i] = static_cast<word32>(c ^ (z & 1) ^ key[i - 4] ^
-            rotrConstant<3>(key[i - 1]) ^ key[i - 3] ^ rotrConstant<4>(key[i - 1]) ^
-            rotrConstant<1>(key[i - 3]));
+        key[i] = c ^ (z & 1) ^ key[i - 4] ^ rotrConstant<3>(key[i - 1]) ^ key[i - 3] ^ rotrConstant<4>(key[i - 1]) ^ rotrConstant<1>(key[i - 3]);
         z >>= 1;
     }
 }
@@ -228,45 +225,6 @@ extern size_t SIMON128_Dec_AdvancedProcessBlocks_SSSE3(const word64* subKeys, si
     const byte *inBlocks, const byte *xorBlocks, byte *outBlocks, size_t length, word32 flags);
 #endif
 
-#if (CRYPTOPP_ALTIVEC_AVAILABLE)
-extern size_t SIMON64_Enc_AdvancedProcessBlocks_ALTIVEC(const word32* subKeys, size_t rounds,
-    const byte *inBlocks, const byte *xorBlocks, byte *outBlocks, size_t length, word32 flags);
-
-extern size_t SIMON64_Dec_AdvancedProcessBlocks_ALTIVEC(const word32* subKeys, size_t rounds,
-    const byte *inBlocks, const byte *xorBlocks, byte *outBlocks, size_t length, word32 flags);
-#endif
-
-#if (CRYPTOPP_POWER8_AVAILABLE)
-extern size_t SIMON128_Enc_AdvancedProcessBlocks_POWER8(const word64* subKeys, size_t rounds,
-    const byte *inBlocks, const byte *xorBlocks, byte *outBlocks, size_t length, word32 flags);
-
-extern size_t SIMON128_Dec_AdvancedProcessBlocks_POWER8(const word64* subKeys, size_t rounds,
-    const byte *inBlocks, const byte *xorBlocks, byte *outBlocks, size_t length, word32 flags);
-#endif
-
-std::string SIMON64::Base::AlgorithmProvider() const
-{
-#if (CRYPTOPP_SIMON64_ADVANCED_PROCESS_BLOCKS)
-# if (CRYPTOPP_SSE41_AVAILABLE)
-    if (HasSSE41())
-        return "SSE4.1";
-# endif
-# if (CRYPTOPP_ARM_NEON_AVAILABLE)
-    if (HasNEON())
-        return "NEON";
-# endif
-# if (CRYPTOPP_POWER8_AVAILABLE)
-    if (HasPower8())
-        return "Power8";
-# endif
-# if (CRYPTOPP_ALTIVEC_AVAILABLE)
-    if (HasAltivec())
-        return "Altivec";
-# endif
-#endif
-    return "C++";
-}
-
 void SIMON64::Base::UncheckedSetKey(const byte *userKey, unsigned int keyLength, const NameValuePairs &params)
 {
     CRYPTOPP_ASSERT(keyLength == 12 || keyLength == 16);
@@ -278,7 +236,7 @@ void SIMON64::Base::UncheckedSetKey(const byte *userKey, unsigned int keyLength,
     m_wspace.New(4U);
 
     // Do the endian gyrations from the paper and align pointers
-    typedef GetBlock<word32, LittleEndian> KeyBlock;
+    typedef GetBlock<word32, LittleEndian, false> KeyBlock;
     KeyBlock kblk(userKey);
 
     switch (m_kwords)
@@ -296,18 +254,12 @@ void SIMON64::Base::UncheckedSetKey(const byte *userKey, unsigned int keyLength,
     default:
         CRYPTOPP_ASSERT(0);;
     }
-
-    // Altivec loads the current subkey as a 16-byte vector
-    // The extra elements ensure memory backs the last subkey.
-#if CRYPTOPP_ALTIVEC_AVAILABLE
-    m_rkeys.Grow(m_rkeys.size()+4);
-#endif
 }
 
 void SIMON64::Enc::ProcessAndXorBlock(const byte *inBlock, const byte *xorBlock, byte *outBlock) const
 {
     // Do the endian gyrations from the paper and align pointers
-    typedef GetBlock<word32, LittleEndian> InBlock;
+    typedef GetBlock<word32, LittleEndian, false> InBlock;
     InBlock iblk(inBlock); iblk(m_wspace[1])(m_wspace[0]);
 
     switch (m_rounds)
@@ -323,14 +275,14 @@ void SIMON64::Enc::ProcessAndXorBlock(const byte *inBlock, const byte *xorBlock,
     }
 
     // Do the endian gyrations from the paper and align pointers
-    typedef PutBlock<word32, LittleEndian> OutBlock;
+    typedef PutBlock<word32, LittleEndian, false> OutBlock;
     OutBlock oblk(xorBlock, outBlock); oblk(m_wspace[3])(m_wspace[2]);
 }
 
 void SIMON64::Dec::ProcessAndXorBlock(const byte *inBlock, const byte *xorBlock, byte *outBlock) const
 {
     // Do the endian gyrations from the paper and align pointers
-    typedef GetBlock<word32, LittleEndian> InBlock;
+    typedef GetBlock<word32, LittleEndian, false> InBlock;
     InBlock iblk(inBlock); iblk(m_wspace[1])(m_wspace[0]);
 
     switch (m_rounds)
@@ -346,30 +298,11 @@ void SIMON64::Dec::ProcessAndXorBlock(const byte *inBlock, const byte *xorBlock,
     }
 
     // Do the endian gyrations from the paper and align pointers
-    typedef PutBlock<word32, LittleEndian> OutBlock;
+    typedef PutBlock<word32, LittleEndian, false> OutBlock;
     OutBlock oblk(xorBlock, outBlock); oblk(m_wspace[3])(m_wspace[2]);
 }
 
 ///////////////////////////////////////////////////////////
-
-std::string SIMON128::Base::AlgorithmProvider() const
-{
-#if (CRYPTOPP_SIMON128_ADVANCED_PROCESS_BLOCKS)
-# if (CRYPTOPP_SSSE3_AVAILABLE)
-    if (HasSSSE3())
-        return "SSSE3";
-# endif
-# if (CRYPTOPP_ARM_NEON_AVAILABLE)
-    if (HasNEON())
-        return "NEON";
-# endif
-# if (CRYPTOPP_POWER8_AVAILABLE)
-    if (HasPower8())
-        return "Power8";
-# endif
-#endif
-    return "C++";
-}
 
 void SIMON128::Base::UncheckedSetKey(const byte *userKey, unsigned int keyLength, const NameValuePairs &params)
 {
@@ -382,7 +315,7 @@ void SIMON128::Base::UncheckedSetKey(const byte *userKey, unsigned int keyLength
     m_wspace.New(4U);
 
     // Do the endian gyrations from the paper and align pointers
-    typedef GetBlock<word64, LittleEndian> KeyBlock;
+    typedef GetBlock<word64, LittleEndian, false> KeyBlock;
     KeyBlock kblk(userKey);
 
     switch (m_kwords)
@@ -410,7 +343,7 @@ void SIMON128::Base::UncheckedSetKey(const byte *userKey, unsigned int keyLength
 void SIMON128::Enc::ProcessAndXorBlock(const byte *inBlock, const byte *xorBlock, byte *outBlock) const
 {
     // Do the endian gyrations from the paper and align pointers
-    typedef GetBlock<word64, LittleEndian> InBlock;
+    typedef GetBlock<word64, LittleEndian, false> InBlock;
     InBlock iblk(inBlock); iblk(m_wspace[1])(m_wspace[0]);
 
     switch (m_rounds)
@@ -429,14 +362,14 @@ void SIMON128::Enc::ProcessAndXorBlock(const byte *inBlock, const byte *xorBlock
     }
 
     // Do the endian gyrations from the paper and align pointers
-    typedef PutBlock<word64, LittleEndian> OutBlock;
+    typedef PutBlock<word64, LittleEndian, false> OutBlock;
     OutBlock oblk(xorBlock, outBlock); oblk(m_wspace[3])(m_wspace[2]);
 }
 
 void SIMON128::Dec::ProcessAndXorBlock(const byte *inBlock, const byte *xorBlock, byte *outBlock) const
 {
     // Do the endian gyrations from the paper and align pointers
-    typedef GetBlock<word64, LittleEndian> InBlock;
+    typedef GetBlock<word64, LittleEndian, false> InBlock;
     InBlock iblk(inBlock); iblk(m_wspace[1])(m_wspace[0]);
 
     switch (m_rounds)
@@ -455,7 +388,7 @@ void SIMON128::Dec::ProcessAndXorBlock(const byte *inBlock, const byte *xorBlock
     }
 
     // Do the endian gyrations from the paper and align pointers
-    typedef PutBlock<word64, LittleEndian> OutBlock;
+    typedef PutBlock<word64, LittleEndian, false> OutBlock;
     OutBlock oblk(xorBlock, outBlock); oblk(m_wspace[3])(m_wspace[2]);
 }
 
@@ -473,11 +406,6 @@ size_t SIMON64::Enc::AdvancedProcessBlocks(const byte *inBlocks, const byte *xor
         return SIMON64_Enc_AdvancedProcessBlocks_NEON(m_rkeys, (size_t)m_rounds,
             inBlocks, xorBlocks, outBlocks, length, flags);
 #endif
-#if (CRYPTOPP_ALTIVEC_AVAILABLE)
-    if (HasAltivec())
-        return SIMON64_Enc_AdvancedProcessBlocks_ALTIVEC(m_rkeys, (size_t)m_rounds,
-            inBlocks, xorBlocks, outBlocks, length, flags);
-#endif
     return BlockTransformation::AdvancedProcessBlocks(inBlocks, xorBlocks, outBlocks, length, flags);
 }
 
@@ -492,11 +420,6 @@ size_t SIMON64::Dec::AdvancedProcessBlocks(const byte *inBlocks, const byte *xor
 #if (CRYPTOPP_ARM_NEON_AVAILABLE)
     if (HasNEON())
         return SIMON64_Dec_AdvancedProcessBlocks_NEON(m_rkeys, (size_t)m_rounds,
-            inBlocks, xorBlocks, outBlocks, length, flags);
-#endif
-#if (CRYPTOPP_ALTIVEC_AVAILABLE)
-    if (HasAltivec())
-        return SIMON64_Dec_AdvancedProcessBlocks_ALTIVEC(m_rkeys, (size_t)m_rounds,
             inBlocks, xorBlocks, outBlocks, length, flags);
 #endif
     return BlockTransformation::AdvancedProcessBlocks(inBlocks, xorBlocks, outBlocks, length, flags);
@@ -517,11 +440,6 @@ size_t SIMON128::Enc::AdvancedProcessBlocks(const byte *inBlocks, const byte *xo
         return SIMON128_Enc_AdvancedProcessBlocks_NEON(m_rkeys, (size_t)m_rounds,
             inBlocks, xorBlocks, outBlocks, length, flags);
 #endif
-#if (CRYPTOPP_POWER8_AVAILABLE)
-    if (HasPower8())
-        return SIMON128_Enc_AdvancedProcessBlocks_POWER8(m_rkeys, (size_t)m_rounds,
-            inBlocks, xorBlocks, outBlocks, length, flags);
-#endif
     return BlockTransformation::AdvancedProcessBlocks(inBlocks, xorBlocks, outBlocks, length, flags);
 }
 
@@ -536,11 +454,6 @@ size_t SIMON128::Dec::AdvancedProcessBlocks(const byte *inBlocks, const byte *xo
 #if (CRYPTOPP_ARM_NEON_AVAILABLE)
     if (HasNEON())
         return SIMON128_Dec_AdvancedProcessBlocks_NEON(m_rkeys, (size_t)m_rounds,
-            inBlocks, xorBlocks, outBlocks, length, flags);
-#endif
-#if (CRYPTOPP_POWER8_AVAILABLE)
-    if (HasPower8())
-        return SIMON128_Dec_AdvancedProcessBlocks_POWER8(m_rkeys, (size_t)m_rounds,
             inBlocks, xorBlocks, outBlocks, length, flags);
 #endif
     return BlockTransformation::AdvancedProcessBlocks(inBlocks, xorBlocks, outBlocks, length, flags);

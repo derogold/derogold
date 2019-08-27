@@ -294,8 +294,6 @@ public:
   void rename(const std::string& newPath, std::error_code& ec);
   void rename(const std::string& newPath);
 
-  std::string getPath() const;
-
   template<class F>
   void atomicUpdate(F&& func);
 
@@ -756,12 +754,6 @@ template<class T>
 void FileMappedVector<T>::rename(const std::string& newPath) {
   m_file.rename(newPath);
   m_path = newPath;
-}
-
-template<class T>
-std::string FileMappedVector<T>::getPath() const
-{
-    return m_path;
 }
 
 template<class T>
