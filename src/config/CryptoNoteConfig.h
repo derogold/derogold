@@ -108,6 +108,12 @@ namespace CryptoNote
 
         const uint64_t DEFAULT_DUST_THRESHOLD = UINT64_C(0);
 
+        const uint64_t DEFAULT_DUST_THRESHOLD_V2 = UINT64_C(100);
+
+        const uint32_t DUST_THRESHOLD_V2_HEIGHT = 1787900;
+
+        const uint32_t FUSION_DUST_THRESHOLD_HEIGHT_V2 = DUST_THRESHOLD_V2_HEIGHT;
+
         const uint64_t EXPECTED_NUMBER_OF_BLOCKS_PER_DAY = 24 * 60 * 60 / DIFFICULTY_TARGET_V2;
 
         const size_t DIFFICULTY_WINDOW = 60;
@@ -179,11 +185,12 @@ namespace CryptoNote
         const uint64_t FORK_HEIGHTS[] = {
             700000, // 0
             1470000, // 1
-            2100000, // 2
+            1787900, // 2
+            2100000, // 3
         };
 
         /* MAKE SURE TO UPDATE THIS VALUE WITH EVERY MAJOR RELEASE BEFORE A FORK */
-        const uint64_t SOFTWARE_SUPPORTED_FORK_INDEX = 1;
+        const uint64_t SOFTWARE_SUPPORTED_FORK_INDEX = 2;
 
         const uint64_t FORK_HEIGHTS_SIZE = sizeof(FORK_HEIGHTS) / sizeof(*FORK_HEIGHTS);
 
@@ -239,9 +246,7 @@ namespace CryptoNote
     };
 
     const size_t BLOCKS_IDS_SYNCHRONIZING_DEFAULT_COUNT = 10000; // by default, blocks ids count in synchronizing
-
     const uint64_t BLOCKS_SYNCHRONIZING_DEFAULT_COUNT = 100; // by default, blocks count in blocks downloading
-
     const size_t COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT = 1000;
 
     const int P2P_DEFAULT_PORT = 42069;
@@ -256,9 +261,9 @@ namespace CryptoNote
 
     // P2P Network Configuration Section - This defines our current P2P network version
     // and the minimum version for communication between nodes
-    const uint8_t P2P_CURRENT_VERSION = 3;
+    const uint8_t P2P_CURRENT_VERSION = 4;
 
-    const uint8_t P2P_MINIMUM_VERSION = 2;
+    const uint8_t P2P_MINIMUM_VERSION = 3;
 
     // This defines the minimum P2P version required for lite blocks propogation
     const uint8_t P2P_LITE_BLOCKS_PROPOGATION_VERSION = 0;
