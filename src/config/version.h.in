@@ -6,9 +6,9 @@
 #define PROJECT_COPYRIGHT "Copyright 2019, The Dero Gold Association"
 
 #define APP_VER_MAJOR 0
-#define APP_VER_MINOR 1
-#define APP_VER_REV 1
-#define APP_VER_BUILD 12
+#define APP_VER_MINOR 3
+#define APP_VER_REV 2
+#define APP_VER_BUILD 1
 
 #define BUILD_COMMIT_ID "@VERSION@"
 #define PROJECT_VERSION STR(APP_VER_MAJOR) "." STR(APP_VER_MINOR) "." STR(APP_VER_REV)

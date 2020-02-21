@@ -1,31 +1,24 @@
-// Copyright (c) 2018, The TurtleCoin Developers
-// 
+// Copyright (c) 2018-2019, The TurtleCoin Developers
+//
 // Please see the included LICENSE file for more information.
 
-#include "json.hpp"
-
 #include <string>
-
 #include <vector>
-
-#include <WalletBackend/WalletBackend.h>
-
-using nlohmann::json;
+#include <walletbackend/WalletBackend.h>
 
 struct AddressBookEntry
 {
     AddressBookEntry() {}
 
     /* Used for quick comparison with strings */
-    AddressBookEntry(const std::string friendlyName) : friendlyName(friendlyName) {}
+    AddressBookEntry(const std::string friendlyName): friendlyName(friendlyName) {}
 
-    AddressBookEntry(
-        const std::string friendlyName,
-        const std::string address,
-        const std::string paymentID) :
+    AddressBookEntry(const std::string friendlyName, const std::string address, const std::string paymentID):
         friendlyName(friendlyName),
         address(address),
-        paymentID(paymentID) {}
+        paymentID(paymentID)
+    {
+    }
 
     /* Friendly name for this address book entry */
     std::string friendlyName;
@@ -41,6 +34,29 @@ struct AddressBookEntry
     {
         return rhs.friendlyName == friendlyName;
     }
+
+    template<typename Writer> void toJSON(Writer &writer) const
+    {
+        writer.StartObject();
+
+        writer.Key("friendlyName");
+        writer.String(friendlyName);
+
+        writer.Key("address");
+        writer.String(address);
+
+        writer.Key("paymentID");
+        writer.String(paymentID);
+
+        writer.EndObject();
+    }
+
+    void fromJSON(const JSONValue &j)
+    {
+        friendlyName = getStringFromJSON(j, "friendlyName");
+        address = getStringFromJSON(j, "address");
+        paymentID = getStringFromJSON(j, "paymentID");
+    }
 };
 
 void addToAddressBook();
@@ -51,8 +67,7 @@ void deleteFromAddressBook();
 
 void listAddressBook();
 
-const std::tuple<bool, AddressBookEntry> getAddressBookEntry(
-    const std::vector<AddressBookEntry> addressBook);
+const std::tuple<bool, AddressBookEntry> getAddressBookEntry(const std::vector<AddressBookEntry> addressBook);
 
 const std::string getAddressBookName(const std::vector<AddressBookEntry> addressBook);
 
@@ -61,7 +76,3 @@ std::vector<AddressBookEntry> getAddressBook();
 bool saveAddressBook(const std::vector<AddressBookEntry> addressBook);
 
 bool isAddressBookEmpty(const std::vector<AddressBookEntry> addressBook);
-
-void to_json(json &j, const AddressBookEntry &a);
-
-void from_json(const json &j, AddressBookEntry &a);

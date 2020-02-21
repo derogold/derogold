@@ -1,5 +1,5 @@
-// Copyright (c) 2018, The TurtleCoin Developers
-// 
+// Copyright (c) 2018-2019, The TurtleCoin Developers
+//
 // Please see the included LICENSE file for more information.
 
 ////////////////////////////////////
@@ -7,14 +7,15 @@
 ////////////////////////////////////
 
 #include <config/WalletConfig.h>
-
-#include <Errors/ValidateParameters.h>
-
+#include <errors/ValidateParameters.h>
 #include <fstream>
-
 #include <iostream>
-
-#include <Utilities/ColouredMsg.h>
+#include <rapidjson/istreamwrapper.h>
+#include <rapidjson/ostreamwrapper.h>
+#include <rapidjson/prettywriter.h>
+#include <utilities/ColouredMsg.h>
+#include <utilities/Input.h>
+#include <utilities/String.h>
 #include <zedwallet++/GetInput.h>
 #include <zedwallet++/Transfer.h>
 #include <zedwallet++/Utilities.h>
@@ -30,16 +31,15 @@ const std::string getAddressBookName(const std::vector<AddressBookEntry> address
 
         std::getline(std::cin, friendlyName);
 
-        Common::trim(friendlyName);
+        Utilities::trim(friendlyName);
 
-        const auto it = std::find(addressBook.begin(), addressBook.end(),
-                                  AddressBookEntry(friendlyName));
+        const auto it = std::find(addressBook.begin(), addressBook.end(), AddressBookEntry(friendlyName));
 
         if (it != addressBook.end())
         {
-            std::cout << WarningMsg("An address book entry with this ")
-                      << WarningMsg("name already exists!")
-                      << std::endl << std::endl;
+            std::cout << WarningMsg("An address book entry with this ") << WarningMsg("name already exists!")
+                      << std::endl
+                      << std::endl;
 
             continue;
         }
@@ -52,7 +52,8 @@ void addToAddressBook()
 {
     std::cout << InformationMsg("Note: You can type cancel at any time to "
                                 "cancel adding someone to your address book.")
-              << std::endl << std::endl;
+              << std::endl
+              << std::endl;
 
     auto addressBook = getAddressBook();
 
@@ -60,22 +61,18 @@ void addToAddressBook()
 
     if (friendlyName == "cancel")
     {
-        std::cout << WarningMsg("Cancelling addition to address book.")
-                  << std::endl;
+        std::cout << WarningMsg("Cancelling addition to address book.") << std::endl;
         return;
     }
 
     const bool integratedAddressesAllowed(true), cancelAllowed(true);
 
-    const std::string address = getAddress(
-        "\nWhat address does this user have?: ", integratedAddressesAllowed,
-        cancelAllowed
-    );
+    const std::string address =
+        getAddress("\nWhat address does this user have?: ", integratedAddressesAllowed, cancelAllowed);
 
     if (address == "cancel")
     {
-        std::cout << WarningMsg("Cancelling addition to address book.")
-                  << std::endl;
+        std::cout << WarningMsg("Cancelling addition to address book.") << std::endl;
         return;
     }
 
@@ -88,13 +85,12 @@ void addToAddressBook()
 
         paymentID = getPaymentID(
             "\nDoes this address book entry have a payment ID associated "
-            "with it?\n", cancelAllowed
-        );
+            "with it?\n",
+            cancelAllowed);
 
         if (paymentID == "cancel")
         {
-            std::cout << WarningMsg("Cancelling addition to address book.")
-                      << std::endl;
+            std::cout << WarningMsg("Cancelling addition to address book.") << std::endl;
 
             return;
         }
@@ -109,19 +105,17 @@ void addToAddressBook()
     }
 }
 
-const std::tuple<bool, AddressBookEntry> getAddressBookEntry(
-    const std::vector<AddressBookEntry> addressBook)
+const std::tuple<bool, AddressBookEntry> getAddressBookEntry(const std::vector<AddressBookEntry> addressBook)
 {
     while (true)
     {
         std::string friendlyName;
 
-        std::cout << InformationMsg("Who do you want to send to from your ")
-                  << InformationMsg("address book?: ");
+        std::cout << InformationMsg("Who do you want to send to from your ") << InformationMsg("address book?: ");
 
         std::getline(std::cin, friendlyName);
 
-        Common::trim(friendlyName);
+        Utilities::trim(friendlyName);
 
         /* \n == no-op */
         if (friendlyName == "")
@@ -142,12 +136,8 @@ const std::tuple<bool, AddressBookEntry> getAddressBookEntry(
 
             if (selectionNum < 0 || selectionNum >= numCommands)
             {
-                std::cout << WarningMsg("Bad input, expected a friendly name, ")
-                          << WarningMsg("or number from ")
-                          << InformationMsg("1")
-                          << WarningMsg(" to ")
-                          << InformationMsg(numCommands)
-                          << "\n\n";
+                std::cout << WarningMsg("Bad input, expected a friendly name, ") << WarningMsg("or number from ")
+                          << InformationMsg("1") << WarningMsg(" to ") << InformationMsg(numCommands) << "\n\n";
 
                 continue;
             }
@@ -158,20 +148,15 @@ const std::tuple<bool, AddressBookEntry> getAddressBookEntry(
         {
             const int numCommands = static_cast<int>(addressBook.size());
 
-            std::cout << WarningMsg("Bad input, expected a friendly name, ")
-                      << WarningMsg("or number from ")
-                      << InformationMsg("1")
-                      << WarningMsg(" to ")
-                      << InformationMsg(numCommands)
-                      << "\n\n";
+            std::cout << WarningMsg("Bad input, expected a friendly name, ") << WarningMsg("or number from ")
+                      << InformationMsg("1") << WarningMsg(" to ") << InformationMsg(numCommands) << "\n\n";
 
             continue;
         }
         /* Input isn't a number */
         catch (const std::invalid_argument &)
         {
-            const auto it = std::find(addressBook.begin(), addressBook.end(),
-                                      AddressBookEntry(friendlyName));
+            const auto it = std::find(addressBook.begin(), addressBook.end(), AddressBookEntry(friendlyName));
 
             if (it != addressBook.end())
             {
@@ -179,15 +164,12 @@ const std::tuple<bool, AddressBookEntry> getAddressBookEntry(
             }
 
             std::cout << std::endl
-                      << WarningMsg("Could not find a user with the name of ")
-                      << InformationMsg(friendlyName)
-                      << WarningMsg(" in your address book!")
-                      << std::endl << std::endl;
+                      << WarningMsg("Could not find a user with the name of ") << InformationMsg(friendlyName)
+                      << WarningMsg(" in your address book!") << std::endl
+                      << std::endl;
         }
 
-        const bool list = ZedUtilities::confirm(
-            "Would you like to list everyone in your address book?"
-        );
+        const bool list = Utilities::confirm("Would you like to list everyone in your address book?");
 
         std::cout << "\n";
 
@@ -220,28 +202,22 @@ void sendFromAddressBook(const std::shared_ptr<WalletBackend> walletBackend)
 
     const bool cancelAllowed = true;
 
-    const auto [success, amount] = getAmountToAtomic(
-        "How much " + WalletConfig::ticker + " do you want to send?: ",
-        cancelAllowed
-    );
+    const auto [success, amount] =
+        getAmountToAtomic("How much " + WalletConfig::ticker + " do you want to send?: ", cancelAllowed);
 
     if (!success)
     {
         std::cout << WarningMsg("Cancelling transaction.\n");
     }
 
-    sendTransaction(
-        walletBackend, addressBookEntry.address, amount,
-        addressBookEntry.paymentID
-    );
+    sendTransaction(walletBackend, addressBookEntry.address, amount, addressBookEntry.paymentID);
 }
 
 bool isAddressBookEmpty(const std::vector<AddressBookEntry> addressBook)
 {
     if (addressBook.empty())
     {
-        std::cout << WarningMsg("Your address book is empty! Add some people ")
-                  << WarningMsg("to it first.")
+        std::cout << WarningMsg("Your address book is empty! Add some people ") << WarningMsg("to it first.")
                   << std::endl;
 
         return true;
@@ -266,12 +242,11 @@ void deleteFromAddressBook()
 
         std::string friendlyName;
 
-        std::cout << InformationMsg("What address book entry do you want to ")
-                  << InformationMsg("delete?: ");
+        std::cout << InformationMsg("What address book entry do you want to ") << InformationMsg("delete?: ");
 
         std::getline(std::cin, friendlyName);
 
-        Common::trim(friendlyName);
+        Utilities::trim(friendlyName);
 
         if (friendlyName == "cancel")
         {
@@ -279,8 +254,7 @@ void deleteFromAddressBook()
             return;
         }
 
-        const auto it = std::remove(addressBook.begin(), addressBook.end(),
-                                    AddressBookEntry(friendlyName));
+        const auto it = std::remove(addressBook.begin(), addressBook.end(), AddressBookEntry(friendlyName));
 
         if (it != addressBook.end())
         {
@@ -289,21 +263,17 @@ void deleteFromAddressBook()
             if (saveAddressBook(addressBook))
             {
                 std::cout << std::endl
-                          << SuccessMsg("This entry has been deleted from ")
-                          << SuccessMsg("your address book!")
+                          << SuccessMsg("This entry has been deleted from ") << SuccessMsg("your address book!")
                           << std::endl;
             }
 
             return;
         }
 
-        std::cout << WarningMsg("\nCould not find a user with the name of ")
-                  << InformationMsg(friendlyName)
+        std::cout << WarningMsg("\nCould not find a user with the name of ") << InformationMsg(friendlyName)
                   << WarningMsg(" in your address book!\n\n");
 
-        const bool list = ZedUtilities::confirm(
-            "Would you like to list everyone in your address book?"
-        );
+        const bool list = Utilities::confirm("Would you like to list everyone in your address book?");
 
         std::cout << "\n";
 
@@ -327,16 +297,13 @@ void listAddressBook()
 
     for (const auto entry : addressBook)
     {
-        std::cout << InformationMsg("Address Book Entry: ")
-                  << InformationMsg(i) << InformationMsg(" | ")
+        std::cout << InformationMsg("Address Book Entry: ") << InformationMsg(i) << InformationMsg(" | ")
                   << SuccessMsg(entry.friendlyName) << "\n"
-                  << InformationMsg("Address: ")
-                  << SuccessMsg(entry.address) << "\n";
+                  << InformationMsg("Address: ") << SuccessMsg(entry.address) << "\n";
 
         if (entry.paymentID != "")
         {
-            std::cout << InformationMsg("Payment ID: ")
-                      << SuccessMsg(entry.paymentID) << "\n\n";
+            std::cout << InformationMsg("Payment ID: ") << SuccessMsg(entry.paymentID) << "\n\n";
         }
         else
         {
@@ -356,47 +323,43 @@ std::vector<AddressBookEntry> getAddressBook()
     /* If file exists, read current values */
     if (input)
     {
-        json j;
-        input >> j;
-
-        addressBook = j.get<std::vector<AddressBookEntry>>();
+        rapidjson::IStreamWrapper isw(input);
+        rapidjson::Document j;
+        if (!j.ParseStream(isw).HasParseError())
+        {
+            for (auto &v : j.GetArray())
+            {
+                AddressBookEntry entry;
+                entry.fromJSON(v);
+                addressBook.push_back(entry);
+            }
+        }
     }
 
     return addressBook;
 }
 
-void to_json(json &j, const AddressBookEntry &a)
-{
-    j = {
-        {"friendlyName", a.friendlyName},
-        {"address", a.address},
-        {"paymentID", a.paymentID},
-    };
-}
-
-void from_json(const json &j, AddressBookEntry &a)
-{
-    a.friendlyName = j.at("friendlyName").get<std::string>();
-    a.address = j.at("address").get<std::string>();
-    a.paymentID = j.at("paymentID").get<std::string>();
-}
-
 bool saveAddressBook(const std::vector<AddressBookEntry> addressBook)
 {
-    json addressBookJson = addressBook;
-
     std::ofstream output(WalletConfig::addressBookFilename);
 
     if (output)
     {
-        output << std::setw(4) << addressBookJson << std::endl;
+        rapidjson::OStreamWrapper osw(output);
+        rapidjson::PrettyWriter<rapidjson::OStreamWrapper> writer(osw);
+        writer.StartArray();
+        for (auto &entry : addressBook)
+        {
+            entry.toJSON(writer);
+        }
+        writer.EndArray();
+        writer.Flush();
     }
     else
     {
-        std::cout << WarningMsg("Failed to save address book to disk!")
-                  << std::endl
-                  << WarningMsg("Check you are able to write files to your ")
-                  << WarningMsg("current directory.") << std::endl;
+        std::cout << WarningMsg("Failed to save address book to disk!") << std::endl
+                  << WarningMsg("Check you are able to write files to your ") << WarningMsg("current directory.")
+                  << std::endl;
 
         return false;
     }

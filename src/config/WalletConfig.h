@@ -51,17 +51,16 @@ namespace WalletConfig
        payment ID's are 64 chars, and base58 encoding is done by encoding
        chunks of 8 chars at once into blocks of 11 chars, we can calculate
        this automatically */
-    const uint16_t integratedAddressLength = standardAddressLength
-                                           + ((64 * 11) / 8);
+    const uint16_t integratedAddressLength = standardAddressLength + ((64 * 11) / 8);
 
     /* The default fee value to use with transactions (in ATOMIC units!) */
-    const uint64_t defaultFee = CryptoNote::parameters::MINIMUM_FEE; 
+    const uint64_t defaultFee = CryptoNote::parameters::MINIMUM_FEE_V1;
 
     /* The minimum fee value to allow with transactions (in ATOMIC units!) */
-    const uint64_t minimumFee = CryptoNote::parameters::MINIMUM_FEE;
+    const uint64_t minimumFee = CryptoNote::parameters::MINIMUM_FEE_V1;
 
     /* The minimum amount allowed to be sent - usually 1 (in ATOMIC units!) */
-    const uint64_t minimumSend = 1;
+    const uint64_t minimumSend = 100000;
 
     /* Is a mixin of zero disabled on your network? */
     const bool mixinZeroDisabled = false;
@@ -71,7 +70,19 @@ namespace WalletConfig
        zero is allowed */
     const uint64_t mixinZeroDisabledHeight = 0;
 
-    /* Should we process coinbase transactions? We can skip them to speed up
-       syncing, as most people don't have solo mined transactions */
-    const bool processCoinbaseTransactions = true;
-}
+    /**
+     * Max size of a post body response - 10MB
+     * Will decrease the amount of blocks requested from the daemon if this
+     * is exceeded.
+     * Note - blockStoreMemoryLimit - maxBodyResponseSize should be greater
+     * than zero, or no data will get cached.
+     * Further note: Currently blocks request are not decreased if this is
+     * exceeded. Needs to be implemented in future?
+     */
+    const size_t maxBodyResponseSize = 1024 * 1024 * 10;
+
+    /**
+     * The amount of memory to use storing downloaded blocks - 50MB
+     */
+    const size_t blockStoreMemoryLimit = 1024 * 1024 * 50;
+} // namespace WalletConfig

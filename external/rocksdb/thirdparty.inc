@@ -1,3 +1,4 @@
+# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 # Edit definitions below to specify paths to include files and libraries of all 3rd party libraries
 
 # TODO: Make this work with find_package and/or get rid of it
@@ -189,10 +190,10 @@ endif ()
 #
 # Edit these 4 lines to define paths to ZSTD
 #
-set(ZSTD_HOME $ENV{THIRDPARTY_HOME}/ZSTD.Library)
-set(ZSTD_INCLUDE ${ZSTD_HOME}/build/native/inc)
-set(ZSTD_LIB_DEBUG ${ZSTD_HOME}/lib/native/debug/amd64/libzstd_static.lib)
-set(ZSTD_LIB_RELEASE ${ZSTD_HOME}/lib/native/retail/amd64/libzstd_static.lib)
+#set(ZSTD_HOME $ENV{THIRDPARTY_HOME}/ZSTD.Library)
+#set(ZSTD_INCLUDE ${ZSTD_HOME}/build/native/inc)
+#set(ZSTD_LIB_DEBUG ${ZSTD_HOME}/lib/native/debug/amd64/libzstd_static.lib)
+#set(ZSTD_LIB_RELEASE ${ZSTD_HOME}/lib/native/retail/amd64/libzstd_static.lib)
 
 # For compatibility
 if (ZSTD)
@@ -240,7 +241,7 @@ endif()
 
 if (WITH_JEMALLOC)
   message(STATUS "JEMALLOC library is enabled")
-  set(JEMALLOC_CXX_FLAGS "-DROCKSDB_JEMALLOC -DJEMALLOC_EXPORT= ")
+  set(JEMALLOC_CXX_FLAGS "-DROCKSDB_JEMALLOC -DJEMALLOC_EXPORT= -DJEMALLOC_NO_RENAME")
   
   if(DEFINED ENV{JEMALLOC_INCLUDE})
     set(JEMALLOC_INCLUDE $ENV{JEMALLOC_INCLUDE})
