@@ -1501,15 +1501,15 @@ bool Core::getRawBlocks(
 	{
 		const auto poolTx = pool.tryGetTransaction(poolTxHash);
 
-        /* Tx got removed by another thread */
-        if (!poolTx)
-        {
-            continue;
-        }
+            /* Tx got removed by another thread */
+            if (!poolTx)
+            {
+                continue;
+            }
 
-        const auto poolTxState = extractSpentOutputs(*poolTx);
+            const auto poolTxState = extractSpentOutputs(*poolTx);
 
-        auto [mixinSuccess, err] = Mixins::validate({*poolTx}, getTopBlockIndex());
+            auto [mixinSuccess, err] = Mixins::validate({*poolTx}, getTopBlockIndex());
 
 		bool isValid = true;
 
