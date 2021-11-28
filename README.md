@@ -132,10 +132,10 @@ You can build for 32-bit or 64-bit Windows. **If you're not sure, pick 64-bit.**
 - Download the [Build Tools for Visual Studio 2019](https://visualstudio.microsoft.com/thank-you-downloading-visual-studio/?sku=BuildTools&rel=16) Installer
 - When it opens up select **C++ build tools**, it automatically selects the needed parts
 - Install Boost (1.69 works the latest is 1.70 and doesn't work). Select the appropriate version for your system:
-  - [Boost 64-bit](https://bintray.com/boostorg/release/download_file?file_path=1.69.0%2Fbinaries%2Fboost_1_69_0-msvc-14.1-64.exe)
+  - [Boost 64-bit](https://sourceforge.net/projects/boost/files/boost-binaries/1.77.0/boost_1_77_0-msvc-14.1-64.exe/download)
   - [Boost 32-bit](https://bintray.com/boostorg/release/download_file?file_path=1.69.0%2Fbinaries%2Fboost_1_69_0-msvc-14.1-32.exe)
-- Install the latest full version of OpenSSL (currently OpenSSL 1.1.1i). Select the appropriate version for your system:
-  - [OpenSSL 64-bit](https://slproweb.com/download/Win64OpenSSL-1_1_1i.exe)
+- Install the latest full version of OpenSSL (currently OpenSSL 3.0.0). Select the appropriate version for your system:
+  - [OpenSSL 64-bit](https://slproweb.com/download/Win64OpenSSL-3_0_0.exe)
   - [OpenSSL 32-bit](https://slproweb.com/download/Win32OpenSSL-1_1_1i.exe)
 
 ##### Building
@@ -145,12 +145,12 @@ For 64-bit:
 - `cd <your_derogold_directory>`
 - `mkdir build`
 - `cd build`
-- `set PATH="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin";%PATH%`
-- `cmake -G "Visual Studio 16 2019" -A x64 .. -DBOOST_ROOT=C:/local/boost_1_69_0`
+- `set PATH="C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin";%PATH%`
+- `cmake -G "Visual Studio 16 2019" -A x64 .. -DBOOST_ROOT=C:/local/boost_1_77_0`
 
 If you have errors on this step about not being able to find the following static libraries, you may need to update your cmake. Open 'Visual Studio Installer' and click 'Update'.
 
-- `MSBuild DeroGold.sln /p:Configuration=Release /p:PlatformToolset=v141 /m`
+- `MSBuild DeroGold.sln /p:Configuration=Release /p:PlatformToolset=v142 /m`
 
 For 32-bit:
 - `cd <your_derogold_directory>`
