@@ -125,22 +125,19 @@ The binaries will be in the `src` folder when you are complete.
 
 #### Windows with VS2019
 
-##### Prerequisites
+We have dropped support of 32-bit Windows builds.  These instructions are for 64-bit Windows.
 
-You can build for 32-bit or 64-bit Windows. **If you're not sure, pick 64-bit.**
+##### Prerequisites
 
 - Download the [Build Tools for Visual Studio 2019](https://visualstudio.microsoft.com/thank-you-downloading-visual-studio/?sku=BuildTools&rel=16) Installer
 - When it opens up select **C++ build tools**, it automatically selects the needed parts
-- Install Boost (1.69 works the latest is 1.70 and doesn't work). Select the appropriate version for your system:
+- Install Boost (the latest is 1.77).
   - [Boost 64-bit](https://sourceforge.net/projects/boost/files/boost-binaries/1.77.0/boost_1_77_0-msvc-14.1-64.exe/download)
-  - [Boost 32-bit](https://bintray.com/boostorg/release/download_file?file_path=1.69.0%2Fbinaries%2Fboost_1_69_0-msvc-14.1-32.exe)
-- Install the latest full version of OpenSSL (currently OpenSSL 3.0.0). Select the appropriate version for your system:
+ - Install the latest full version of OpenSSL (currently OpenSSL 3.0.0).
   - [OpenSSL 64-bit](https://slproweb.com/download/Win64OpenSSL-3_0_0.exe)
-  - [OpenSSL 32-bit](https://slproweb.com/download/Win32OpenSSL-1_1_1i.exe)
-
+  
 ##### Building
 
-For 64-bit:
 - From the start menu, open 'x64 Native Tools Command Prompt for vs2019'.
 - `cd <your_derogold_directory>`
 - `mkdir build`
@@ -151,17 +148,6 @@ For 64-bit:
 If you have errors on this step about not being able to find the following static libraries, you may need to update your cmake. Open 'Visual Studio Installer' and click 'Update'.
 
 - `MSBuild DeroGold.sln /p:Configuration=Release /p:PlatformToolset=v142 /m`
-
-For 32-bit:
-- `cd <your_derogold_directory>`
-- `mkdir build`
-- `cd build`
-- `set PATH="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin";%PATH%`
-- `cmake -G "Visual Studio 16 2019" -A Win32 .. -DBOOST_ROOT=C:/local/boost_1_69_0`
-
-If you have errors on this step about not being able to find the following static libraries, you may need to update your cmake. Open 'Visual Studio Installer' and click 'Update'.
-
-- `MSBuild DeroGold.sln /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v141 /m`
 
 The binaries will be in the `src/Release` folder when you are complete.
 
