@@ -133,7 +133,7 @@ We have dropped support of 32-bit Windows builds.  These instructions are for 64
 - When it opens up select **C++ build tools**, it automatically selects the needed parts
 - Install Boost (the latest is 1.77).
   - [Boost 64-bit](https://sourceforge.net/projects/boost/files/boost-binaries/1.77.0/boost_1_77_0-msvc-14.1-64.exe/download)
- - Install the latest full version of OpenSSL (currently OpenSSL 3.0.0).
+- Install the latest full version of OpenSSL (currently OpenSSL 3.0.0).
   - [OpenSSL 64-bit](https://slproweb.com/download/Win64OpenSSL-3_0_0.exe)
   
 ##### Building
