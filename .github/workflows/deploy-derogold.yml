@@ -1,0 +1,259 @@
+name: Deploy DeroGold
+
+on:
+  workflow_dispatch:
+    inputs:
+      draft_release:
+        description: 'Create a draft release'
+        default: true
+        type: boolean
+      docker_push:
+        description: 'Push results to docker'
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  actions: write
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  env:
+    name: Get DeroGold Version
+    runs-on: ubuntu-latest
+
+    outputs:
+      version: ${{ steps.get_output_version.outputs.version }}
+      is_latest_version: ${{ steps.is_latest_version.outputs.is_latest_version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          fetch-tags: true
+
+      - id: get_output_version
+        run: |
+          Get-Content "CMakeLists.txt" | Select-String 'project\(DeroGold VERSION ([0-9.]+) ' | ForEach-Object { "version=" + $_.Matches[0].Groups[1].Value } >> "$env:GITHUB_OUTPUT"
+
+      - id: is_latest_version
+        run: |
+          echo is_latest_version=$($(git describe --tags --abbrev=0) -eq "v${{ steps.get_output_version.outputs.version }}") >> "$env:GITHUB_OUTPUT"
+
+  build_derogold:
+    name: ${{ matrix.build_preset }}
+    runs-on: ${{ matrix.os }}
+    needs: env
+    if: github.event.inputs.draft_release
+
+    concurrency: 
+      group: build_derogold_${{ github.ref }}_${{ matrix.os }}_${{ matrix.arch }}_${{ matrix.compiler }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            arch: x64
+            compiler: msvc
+            install: ""
+            configure_preset: windows-x64-msvc-package
+            build_preset: windows-x64-msvc-package
+
+          - os: ubuntu-20.04
+            arch: x64
+            compiler: gcc
+            install: >-
+              build-essential
+              cmake
+              curl
+              git
+              ninja-build
+              pkg-config
+              tar
+              unzip
+              zip
+            configure_preset: linux-x64-gcc-package
+            build_preset: linux-x64-gcc-package
+
+          - os: ubuntu-20.04
+            arch: arm64
+            compiler: gcc
+            install: >-
+              cmake
+              crossbuild-essential-arm64
+              curl
+              git
+              ninja-build
+              pkg-config
+              tar
+              unzip
+              zip
+            configure_preset: linux-arm64-gcc-cross-package
+            build_preset: linux-arm64-gcc-cross-package
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Install Program / Dependencies
+        run: |
+          if ("${{ runner.os }}" -eq "Windows")
+          {
+            if (![string]::IsNullOrWhiteSpace("${{ matrix.install }}"))
+            {
+              choco install -y ${{ matrix.install }}
+            }
+          }
+          elseif ("${{ runner.os }}" -eq "Linux")
+          {
+            if (![string]::IsNullOrWhiteSpace("${{ matrix.install }}"))
+            {
+              sudo apt-get update
+              sudo apt-get install -y ${{ matrix.install }}
+            }
+          }
+          elseif ("${{ runner.os }}" -eq "macOS")
+          {
+            if (![string]::IsNullOrWhiteSpace("${{ matrix.install }}"))
+            {
+              brew update
+              brew install ${{ matrix.install }}
+            }
+          }
+
+      - name: Install CMake
+        uses: lukka/get-cmake@latest
+
+      - name: Setup ccache
+        uses: jianmingyong/ccache-action@v1
+        with:
+          ccache-key-prefix: ccache_cache_${{ runner.os }}_${{ matrix.arch }}_${{ matrix.compiler }}
+          max-size: 150M
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11.5
+
+      - name: Build DeroGold (MSVC/GCC/CLANG)
+        uses: lukka/run-cmake@v10.8
+        with:
+          configurePreset: '${{ matrix.configure_preset }}'
+          buildPreset: '${{ matrix.build_preset }}'
+
+      - name: Collect Logs
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.compiler }}-vcpkg-build-logs
+          path: ${{ github.workspace }}/vcpkg/buildtrees/**/*.log
+          if-no-files-found: ignore
+
+      - name: Upload Package
+        uses: actions/upload-artifact@v4
+        if: success() 
+        with:
+          name: ${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.compiler }}-build
+          path: |
+            ${{ github.workspace }}/build/Packaging/*.zip
+            ${{ github.workspace }}/build/Packaging/*.tar.gz
+            ${{ github.workspace }}/build/Packaging/*.deb
+          if-no-files-found: ignore
+
+  deploy_derogold:
+    name: Deploy DeroGold
+    runs-on: ubuntu-latest
+    needs: [env, build_derogold]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Create artifact directory
+        run: |
+          New-Item 'build' -ItemType 'Directory' -Force
+
+      - name: Download DeroGold artifact
+        uses: actions/download-artifact@v4
+        with:
+          path: build
+          merge-multiple: true
+
+      - name: Deploy DeroGold
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: ${{ github.workspace }}/RELEASE_TEMPLATE.md
+          name: v${{ needs.env.outputs.version }}
+          tag_name: ${{ needs.env.outputs.version }}
+          draft: ${{ github.event.inputs.draft_release }}
+          files: |
+            ${{ github.workspace }}/build/*.zip
+            ${{ github.workspace }}/build/*.tar.gz
+            ${{ github.workspace }}/build/*.deb
+
+  docker_build_derogold:
+    name: Deploy DeroGold Docker
+    runs-on: ubuntu-latest
+    needs: env
+
+    env:
+      DOCKER_HUB_REPOSITORY: jianmingyong/derogold
+
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - id: env
+        run: |
+          $output = @()
+          $output += "${{ env.DOCKER_HUB_REPOSITORY }}:${{ needs.env.outputs.version }}"
+
+          if ("${{ needs.env.outputs.is_latest_version }}" -eq "true")
+          {
+            $output += "${{ env.DOCKER_HUB_REPOSITORY }}:latest"
+          }
+
+          echo tags=$([string]::Join(",", $output)) >> "$env:GITHUB_OUTPUT"
+          echo ACTIONS_CACHE_URL=$env:ACTIONS_CACHE_URL >> "$env:GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
+          target: release_derogoldd
+          tags: ${{ steps.env.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          no-cache-filters: |
+            build
+          build-args: |
+            UBUNTU_VERSION=20.04
+            VCPKG_BINARY_SOURCES=clear;x-gha,readwrite
+            ACTIONS_CACHE_URL=${{ steps.env.outputs.ACTIONS_CACHE_URL }}
+          secret-envs: |
+            ACTIONS_RUNTIME_TOKEN=ACTIONS_RUNTIME_TOKEN
+          push: ${{ github.event.inputs.docker_push }}

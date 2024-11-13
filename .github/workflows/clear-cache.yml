@@ -1,0 +1,58 @@
+name: Clear Cache
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: Maximum number of items to fetch (default is 30, max limit is 100)
+        required: true
+        default: 30
+        type: number
+      key:
+        description: Filter by a key or key prefix
+        required: false
+        type: string
+      order:
+        description: Order of caches returned
+        required: false
+        type: choice
+        options:
+          - asc
+          - desc
+      sort:
+        description: Sort fetched caches
+        required: false
+        type: choice
+        options:
+          - last-used
+          - size
+          - created-at
+
+jobs:
+  clean_up:
+    name: Clean Up Cache
+    runs-on: ubuntu-latest
+
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    concurrency: 
+      group: github_actions_clean_up
+      cancel-in-progress: false
+
+    steps:
+      - name: Cleanup
+        run: |
+          gh extension install actions/gh-actions-cache
+
+          echo "Fetching list of cache key"
+          cacheKeysForPR=$(gh actions-cache list -R ${{ github.repository }} -B ${{ github.ref_name }} -L ${{ inputs.limit }} --key '${{ inputs.key }}' --order ${{ inputs.order }} --sort ${{ inputs.sort }} | cut -f 1 )
+
+          ## Setting this to not fail the workflow while deleting cache keys.
+          set +e
+          echo "Deleting caches..."
+          for cacheKey in $cacheKeysForPR
+          do
+              gh actions-cache delete $cacheKey -R ${{ github.repository }} -B ${{ github.ref }} --confirm
+          done
+          echo "Done"
