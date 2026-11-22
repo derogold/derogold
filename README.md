@@ -13,4 +13,4 @@ We tagged this signpost with **v1.0.2.0** to match the latest release in the act
 - Original core release date: **21 November 2026** (2026-11-21).
 - [Download v1.0.2.0 from derogold-core](https://github.com/derogold/derogold-core/releases/tag/v1.0.2.0).
 
-The release here is only a signpost, published on 22 November 2026. Its automatically generated source archives contain this README, not DeroGold software.
+The release here is a distribution signpost, published on 22 November 2026. Its attached Linux binaries are byte-for-byte copies of the assets published by **derogold-core**. The automatically generated source archives contain only this README.
